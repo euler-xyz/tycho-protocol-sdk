@@ -27,7 +27,45 @@ contract EulerSwapAdapter is ISwapAdapter {
         
         IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
         for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-            prices[i] = priceSingle(pool, sellToken, buyToken, specifiedAmounts[i]);
+            prices[i] = quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
+        }
+    }
+
+    /// @inheritdoc ISwapAdapter
+    function swap(
+        bytes32 poolId,
+        address sellToken,
+        address buyToken,
+        OrderSide side,
+        uint256 specifiedAmount
+    ) external returns (Trade memory trade) {
+        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+
+        bool isAmountOutAsset0 = buyToken == pool.asset0();
+        uint256 amountIn;
+        uint256 amountOut;
+        if (side == OrderSide.Buy) {
+            amountIn = (quoteExactOutput(pool, sellToken, buyToken, specifiedAmount).denominator);
+            trade.calculatedAmount = amountOut = specifiedAmount;
+        } else {
+            trade.calculatedAmount = amountIn = specifiedAmount;
+            amountOut =
+                (quoteExactInput(pool, sellToken, buyToken, specifiedAmount).numerator);
+        }
+
+        IERC20(sellToken).safeTransferFrom(
+            msg.sender, address(pool), amountIn
+        );
+
+        uint256 gasBefore = gasleft();
+        (isAmountOutAsset0) ? pool.swap(amountOut, 0, msg.sender, "") : pool.swap(0, amountOut, msg.sender, "");
+        trade.gasUsed = gasBefore - gasleft();
+
+        if (side == OrderSide.Buy) {
+            trade.price = quoteExactOutput(pool, sellToken, buyToken, specifiedAmount);
+        } else {
+            trade.price =
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmount);
         }
     }
 
@@ -75,7 +113,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 
     /// @notice Calculates pool prices for specified amounts
-    function priceSingle(
+    function quoteExactInput(
         IMaglevEulerSwap pool,
         address tokenIn,
         address tokenOut,
@@ -83,6 +121,16 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal view returns (Fraction memory calculatedPrice) {
         calculatedPrice =
             Fraction(pool.quoteExactInput(tokenIn, tokenOut, amountIn), amountIn);
+    }
+
+    function quoteExactOutput(
+        IMaglevEulerSwap pool,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountOut
+    ) internal view returns (Fraction memory calculatedPrice) {
+        calculatedPrice =
+            Fraction(amountOut, pool.quoteExactOutput(tokenIn, tokenOut, amountOut));
     }
 }
 
