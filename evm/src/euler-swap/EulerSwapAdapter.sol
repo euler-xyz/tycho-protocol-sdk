@@ -70,6 +70,29 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 
     /// @inheritdoc ISwapAdapter
+    function getLimits(bytes32 poolId, address sellToken, address buyToken)
+        external view override
+        returns (uint256[] memory limits) {
+            limits = new uint256[](2);
+
+            IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+            address swapAccount = pool.myAccount();
+            (address token0, address token1) = (sellToken < buyToken) ? (sellToken, buyToken) : (buyToken, sellToken);
+
+            if(token0 == buyToken) {
+                // max amount for buyToken
+                uint256 maxWithdraw = vaultBalance(pool.vault0(), swapAccount);
+
+                limits[1] = maxWithdraw;
+            } else {
+                // max amount for buyToken
+                uint256 maxWithdraw = vaultBalance(pool.vault1(), swapAccount);
+
+                limits[1] = maxWithdraw;
+            }
+    }
+
+    /// @inheritdoc ISwapAdapter
     function getCapabilities(bytes32, address, address)
         external
         pure
@@ -132,6 +155,14 @@ contract EulerSwapAdapter is ISwapAdapter {
         calculatedPrice =
             Fraction(amountOut, pool.quoteExactOutput(tokenIn, tokenOut, amountOut));
     }
+
+    function vaultBalance(address vault, address swapAccount) internal view returns (uint256) {
+        uint256 shares = IEVault(vault).balanceOf(swapAccount);
+
+        return shares == 0 ? 0 : IEVault(vault).convertToAssets(shares);
+
+        // return IEVault(vault).maxWithdraw(swapAccount);
+    }
 }
 
 interface IMaglevEulerSwapFactory {
@@ -181,4 +212,10 @@ interface IMaglevEulerSwap {
     function concentrationY() external view returns (uint256);
     function initialReserve0() external view returns (uint112);
     function initialReserve1() external view returns (uint112);
+}
+
+interface IEVault {
+    function balanceOf(address account) external view returns (uint256);
+    function convertToAssets(uint256 shares) external view returns (uint256);
+    function maxWithdraw(address owner) external view returns (uint256);
 }
