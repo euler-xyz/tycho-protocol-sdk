@@ -24,10 +24,11 @@ contract EulerSwapAdapter is ISwapAdapter {
         uint256[] memory specifiedAmounts
     ) external view override returns (Fraction[] memory prices) {
         prices = new Fraction[](specifiedAmounts.length);
-        
+
         IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
         for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-            prices[i] = quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
+            prices[i] =
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
         }
     }
 
@@ -45,24 +46,30 @@ contract EulerSwapAdapter is ISwapAdapter {
         uint256 amountIn;
         uint256 amountOut;
         if (side == OrderSide.Buy) {
-            amountIn = (quoteExactOutput(pool, sellToken, buyToken, specifiedAmount).denominator);
+            amountIn = (
+                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount)
+                    .denominator
+            );
             trade.calculatedAmount = amountOut = specifiedAmount;
         } else {
             trade.calculatedAmount = amountIn = specifiedAmount;
-            amountOut =
-                (quoteExactInput(pool, sellToken, buyToken, specifiedAmount).numerator);
+            amountOut = (
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmount)
+                    .numerator
+            );
         }
 
-        IERC20(sellToken).safeTransferFrom(
-            msg.sender, address(pool), amountIn
-        );
+        IERC20(sellToken).safeTransferFrom(msg.sender, address(pool), amountIn);
 
         uint256 gasBefore = gasleft();
-        (isAmountOutAsset0) ? pool.swap(amountOut, 0, msg.sender, "") : pool.swap(0, amountOut, msg.sender, "");
+        (isAmountOutAsset0)
+            ? pool.swap(amountOut, 0, msg.sender, "")
+            : pool.swap(0, amountOut, msg.sender, "");
         trade.gasUsed = gasBefore - gasleft();
 
         if (side == OrderSide.Buy) {
-            trade.price = quoteExactOutput(pool, sellToken, buyToken, specifiedAmount);
+            trade.price =
+                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount);
         } else {
             trade.price =
                 quoteExactInput(pool, sellToken, buyToken, specifiedAmount);
@@ -71,25 +78,30 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     /// @inheritdoc ISwapAdapter
     function getLimits(bytes32 poolId, address sellToken, address buyToken)
-        external view override
-        returns (uint256[] memory limits) {
-            limits = new uint256[](2);
+        external
+        view
+        override
+        returns (uint256[] memory limits)
+    {
+        limits = new uint256[](2);
 
-            IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
-            address swapAccount = pool.myAccount();
-            (address token0, address token1) = (sellToken < buyToken) ? (sellToken, buyToken) : (buyToken, sellToken);
+        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+        address swapAccount = pool.myAccount();
+        (address token0, address token1) = (sellToken < buyToken)
+            ? (sellToken, buyToken)
+            : (buyToken, sellToken);
 
-            if(token0 == buyToken) {
-                // max amount for buyToken
-                uint256 maxWithdraw = vaultBalance(pool.vault0(), swapAccount);
+        if (token0 == buyToken) {
+            // max amount for buyToken
+            uint256 maxWithdraw = vaultBalance(pool.vault0(), swapAccount);
 
-                limits[1] = maxWithdraw;
-            } else {
-                // max amount for buyToken
-                uint256 maxWithdraw = vaultBalance(pool.vault1(), swapAccount);
+            limits[1] = maxWithdraw;
+        } else {
+            // max amount for buyToken
+            uint256 maxWithdraw = vaultBalance(pool.vault1(), swapAccount);
 
-                limits[1] = maxWithdraw;
-            }
+            limits[1] = maxWithdraw;
+        }
     }
 
     /// @inheritdoc ISwapAdapter
@@ -142,8 +154,9 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenOut,
         uint256 amountIn
     ) internal view returns (Fraction memory calculatedPrice) {
-        calculatedPrice =
-            Fraction(pool.quoteExactInput(tokenIn, tokenOut, amountIn), amountIn);
+        calculatedPrice = Fraction(
+            pool.quoteExactInput(tokenIn, tokenOut, amountIn), amountIn
+        );
     }
 
     function quoteExactOutput(
@@ -152,11 +165,16 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenOut,
         uint256 amountOut
     ) internal view returns (Fraction memory calculatedPrice) {
-        calculatedPrice =
-            Fraction(amountOut, pool.quoteExactOutput(tokenIn, tokenOut, amountOut));
+        calculatedPrice = Fraction(
+            amountOut, pool.quoteExactOutput(tokenIn, tokenOut, amountOut)
+        );
     }
 
-    function vaultBalance(address vault, address swapAccount) internal view returns (uint256) {
+    function vaultBalance(address vault, address swapAccount)
+        internal
+        view
+        returns (uint256)
+    {
         uint256 shares = IEVault(vault).balanceOf(swapAccount);
 
         return shares == 0 ? 0 : IEVault(vault).convertToAssets(shares);
@@ -166,8 +184,13 @@ contract EulerSwapAdapter is ISwapAdapter {
 }
 
 interface IMaglevEulerSwapFactory {
-    event PoolDeployed(address indexed asset0, address indexed asset1, uint256 indexed feeMultiplier, address pool);
-    
+    event PoolDeployed(
+        address indexed asset0,
+        address indexed asset1,
+        uint256 indexed feeMultiplier,
+        address pool
+    );
+
     function deployPool(
         address vault0,
         address vault1,
@@ -183,17 +206,36 @@ interface IMaglevEulerSwapFactory {
 
     function evc() external view returns (address);
     function allPools(uint256 index) external view returns (address);
-    function getPool(address assetA, address assetB, uint256 fee) external view returns (address);
+    function getPool(address assetA, address assetB, uint256 fee)
+        external
+        view
+        returns (address);
     function allPoolsLength() external view returns (uint256);
-    function getAllPoolsListSlice(uint256 start, uint256 end) external view returns (address[] memory);
+    function getAllPoolsListSlice(uint256 start, uint256 end)
+        external
+        view
+        returns (address[] memory);
 }
 
 interface IMaglevEulerSwap {
     // IMaglevBase
     function configure() external;
-    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external;
-    function quoteExactInput(address tokenIn, address tokenOut, uint256 amountIn) external view returns (uint256);
-    function quoteExactOutput(address tokenIn, address tokenOut, uint256 amountOut) external view returns (uint256);
+    function swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        bytes calldata data
+    ) external;
+    function quoteExactInput(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn
+    ) external view returns (uint256);
+    function quoteExactOutput(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountOut
+    ) external view returns (uint256);
 
     function vault0() external view returns (address);
     function vault1() external view returns (address);
