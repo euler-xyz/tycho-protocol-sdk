@@ -1,6 +1,6 @@
 specVersion: v0.1.0
 package:
-  name: "ethereum_template"
+  name: "ethereum_eulerswap"
   version: v0.1.0
 
 protobuf:
@@ -14,7 +14,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: ../target/wasm32-unknown-unknown/release/ethereum_template_factory.wasm
+    file: ../target/wasm32-unknown-unknown/release/ethereum_eulerswap.wasm
 
 
 network: mainnet
