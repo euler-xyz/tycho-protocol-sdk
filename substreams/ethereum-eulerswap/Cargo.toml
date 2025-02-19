@@ -20,6 +20,9 @@ itertools = "0.10.5"
 serde = "1.0.217"
 serde-sibor = "0.1.0"
 
+hex-literal = "0.4.1"
+substreams-helper = { git = "https://github.com/propeller-heads/tycho-protocol-sdk.git", rev = "b8aeaa3" }
+serde_qs = "0.13.0"
 
 [build-dependencies]
 anyhow = "1"
