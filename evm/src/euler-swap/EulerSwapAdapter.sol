@@ -10,10 +10,12 @@ import {
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
 
-    IMaglevEulerSwapFactory immutable factory;
+    IEulerSwapFactory immutable factory;
+    IEulerSwapPeriphery immutable periphery;
 
-    constructor(address factory_) {
-        factory = IMaglevEulerSwapFactory(factory_);
+    constructor(address factory_, address periphery_) {
+        factory = IEulerSwapFactory(factory_);
+        periphery = IEulerSwapPeriphery(periphery_);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -25,7 +27,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) external view override returns (Fraction[] memory prices) {
         prices = new Fraction[](specifiedAmounts.length);
 
-        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
         for (uint256 i = 0; i < specifiedAmounts.length; i++) {
             prices[i] =
                 quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
@@ -40,7 +42,7 @@ contract EulerSwapAdapter is ISwapAdapter {
         OrderSide side,
         uint256 specifiedAmount
     ) external returns (Trade memory trade) {
-        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
         bool isAmountOutAsset0 = buyToken == pool.asset0();
         uint256 amountIn;
@@ -84,23 +86,21 @@ contract EulerSwapAdapter is ISwapAdapter {
         returns (uint256[] memory limits)
     {
         limits = new uint256[](2);
-
-        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
         address swapAccount = pool.myAccount();
-        (address token0, address token1) = (sellToken < buyToken)
-            ? (sellToken, buyToken)
-            : (buyToken, sellToken);
 
-        if (token0 == buyToken) {
-            // max amount for buyToken
-            uint256 maxWithdraw = vaultBalance(pool.vault0(), swapAccount);
+        IEVC evc = IEVC(IEVault(pool.vault0()).EVC());
+        if (!evc.isAccountOperatorAuthorized(swapAccount, address(pool))) {
+            return limits;
+        }
 
-            limits[1] = maxWithdraw;
+        (uint256 r0, uint256 r1,) = pool.getReserves();
+        if (sellToken < buyToken) {
+            limits[0] = r0;
+            limits[1] = r1;
         } else {
-            // max amount for buyToken
-            uint256 maxWithdraw = vaultBalance(pool.vault1(), swapAccount);
-
-            limits[1] = maxWithdraw;
+            limits[0] = r1;
+            limits[1] = r0;
         }
     }
 
@@ -125,7 +125,7 @@ contract EulerSwapAdapter is ISwapAdapter {
         returns (address[] memory tokens)
     {
         tokens = new address[](2);
-        IMaglevEulerSwap pool = IMaglevEulerSwap(address(bytes20(poolId)));
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
         tokens[0] = address(pool.asset0());
         tokens[1] = address(pool.asset1());
     }
@@ -149,24 +149,30 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     /// @notice Calculates pool prices for specified amounts
     function quoteExactInput(
-        IMaglevEulerSwap pool,
+        IEulerSwap pool,
         address tokenIn,
         address tokenOut,
         uint256 amountIn
     ) internal view returns (Fraction memory calculatedPrice) {
         calculatedPrice = Fraction(
-            pool.quoteExactInput(tokenIn, tokenOut, amountIn), amountIn
+            periphery.quoteExactInput(
+                address(pool), tokenIn, tokenOut, amountIn
+            ),
+            amountIn
         );
     }
 
     function quoteExactOutput(
-        IMaglevEulerSwap pool,
+        IEulerSwap pool,
         address tokenIn,
         address tokenOut,
         uint256 amountOut
     ) internal view returns (Fraction memory calculatedPrice) {
         calculatedPrice = Fraction(
-            amountOut, pool.quoteExactOutput(tokenIn, tokenOut, amountOut)
+            amountOut,
+            periphery.quoteExactOutput(
+                address(pool), tokenIn, tokenOut, amountOut
+            )
         );
     }
 
@@ -183,33 +189,26 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 }
 
-interface IMaglevEulerSwapFactory {
-    event PoolDeployed(
-        address indexed asset0,
-        address indexed asset1,
-        uint256 indexed feeMultiplier,
-        address pool
-    );
+interface IEulerSwapFactory {
+    struct DeployParams {
+        address vault0;
+        address vault1;
+        address swapAccount;
+        uint256 fee;
+        uint256 priceX;
+        uint256 priceY;
+        uint256 concentrationX;
+        uint256 concentrationY;
+        uint112 debtLimit0;
+        uint112 debtLimit1;
+    }
 
-    function deployPool(
-        address vault0,
-        address vault1,
-        address holder,
-        uint112 debtLimit0,
-        uint112 debtLimit1,
-        uint256 fee,
-        uint256 priceX,
-        uint256 priceY,
-        uint256 concentrationX,
-        uint256 concentrationY
-    ) external returns (address);
-
-    function evc() external view returns (address);
-    function allPools(uint256 index) external view returns (address);
-    function getPool(address assetA, address assetB, uint256 fee)
+    function deployPool(DeployParams memory params)
         external
-        view
         returns (address);
+
+    function allPools(uint256 index) external view returns (address);
+    function getPool(bytes32 poolKey) external view returns (address);
     function allPoolsLength() external view returns (uint256);
     function getAllPoolsListSlice(uint256 start, uint256 end)
         external
@@ -217,47 +216,82 @@ interface IMaglevEulerSwapFactory {
         returns (address[] memory);
 }
 
-interface IMaglevEulerSwap {
-    // IMaglevBase
-    function configure() external;
+interface IEulerSwap {
+    struct Params {
+        address vault0;
+        address vault1;
+        address myAccount;
+        uint112 debtLimit0;
+        uint112 debtLimit1;
+        uint256 fee;
+    }
+
+    struct CurveParams {
+        uint256 priceX;
+        uint256 priceY;
+        uint256 concentrationX;
+        uint256 concentrationY;
+    }
+
     function swap(
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
         bytes calldata data
     ) external;
-    function quoteExactInput(
-        address tokenIn,
-        address tokenOut,
-        uint256 amountIn
-    ) external view returns (uint256);
-    function quoteExactOutput(
-        address tokenIn,
-        address tokenOut,
-        uint256 amountOut
-    ) external view returns (uint256);
+    function activate() external;
 
+    function verify(uint256 newReserve0, uint256 newReserve1)
+        external
+        view
+        returns (bool);
+    function curve() external view returns (bytes32);
     function vault0() external view returns (address);
     function vault1() external view returns (address);
     function asset0() external view returns (address);
     function asset1() external view returns (address);
     function myAccount() external view returns (address);
-    function debtLimit0() external view returns (uint112);
-    function debtLimit1() external view returns (uint112);
+    function initialReserve0() external view returns (uint112);
+    function initialReserve1() external view returns (uint112);
     function feeMultiplier() external view returns (uint256);
-    function getReserves() external view returns (uint112, uint112, uint32);
-
-    // IMaglevEulerSwap
+    function getReserves()
+        external
+        view
+        returns (uint112 reserve0, uint112 reserve1, uint32 status);
     function priceX() external view returns (uint256);
     function priceY() external view returns (uint256);
     function concentrationX() external view returns (uint256);
     function concentrationY() external view returns (uint256);
-    function initialReserve0() external view returns (uint112);
-    function initialReserve1() external view returns (uint112);
+}
+
+interface IEulerSwapPeriphery {
+    /// @notice How much `tokenOut` can I get for `amountIn` of `tokenIn`?
+    function quoteExactInput(
+        address eulerSwap,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn
+    ) external view returns (uint256);
+
+    /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`?
+    function quoteExactOutput(
+        address eulerSwap,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountOut
+    ) external view returns (uint256);
 }
 
 interface IEVault {
+    function EVC() external view returns (address);
     function balanceOf(address account) external view returns (uint256);
     function convertToAssets(uint256 shares) external view returns (uint256);
     function maxWithdraw(address owner) external view returns (uint256);
+}
+
+interface IEVC {
+    function isAccountOperatorAuthorized(address account, address operator)
+        external
+        view
+        returns (bool authorized);
 }

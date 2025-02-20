@@ -15,8 +15,10 @@ contract EulerSwapAdapterTest is AdapterTest {
     function setUp() public {
         uint256 forkBlock = 21845705;
         vm.createSelectFork(vm.rpcUrl("mainnet"), forkBlock);
-        adapter =
-            new EulerSwapAdapter(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
+        adapter = new EulerSwapAdapter(
+            0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f,
+            0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f
+        );
 
         vm.label(address(adapter), "EulerSwapAdapter");
         vm.label(WETH, "WETH");
