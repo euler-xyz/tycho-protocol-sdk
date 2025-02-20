@@ -79,7 +79,7 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
                     attribute_schema: vec![],
                     implementation_type: ImplementationType::Custom.into(),
                 }),
-                // tx: Some(tycho_tx),
+                tx: Some(tycho_tx),
             }],
             balance_changes: vec![
                 // TODO: check this
