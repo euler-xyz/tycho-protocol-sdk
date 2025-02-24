@@ -1,0 +1,96 @@
+specVersion: v0.1.0
+package:
+  name: "ethereum_eulerswap"
+  version: v0.1.0
+
+protobuf:
+  files:
+    - tycho/evm/v1/common.proto
+    - tycho/evm/v1/entity.proto
+    - eulerswap.proto
+  importPaths:
+    - ./proto/v1
+    - ../../proto/
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ../target/wasm32-unknown-unknown/release/ethereum_eulerswap.wasm
+
+network: mainnet
+
+modules:
+  # - name: map_protocol_components
+  #   kind: map
+  #   initialBlock: 1
+  #   inputs:
+  #     - source: sf.ethereum.type.v2.Block
+  #   output:
+  #     type: proto:tycho.evm.v1.BlockTransactionProtocolComponents
+
+  # - name: store_protocol_components
+  #   kind: store
+  #   initialBlock: 1
+  #   updatePolicy: set
+  #   valueType: string
+  #   inputs:
+  #     - map: map_protocol_components
+
+  # - name: map_relative_component_balance
+  #   kind: map
+  #   initialBlock: 1
+  #   inputs:
+  #     - source: sf.ethereum.type.v2.Block
+  #     - store: store_protocol_components
+  #   output:
+  #     type: proto:tycho.evm.v1.BlockBalanceDeltas
+
+  # - name: store_balances
+  #   kind: store
+  #   initialBlock: 1
+  #   updatePolicy: add
+  #   valueType: bigint
+  #   inputs:
+  #     - map: map_relative_component_balance
+
+  # - name: map_protocol_changes
+  #   kind: map
+  #   initialBlock: 1
+  #   inputs:
+  #     - source: sf.ethereum.type.v2.Block
+  #     - map: map_protocol_components
+  #     - map: map_relative_component_balance
+  #     - store: store_protocol_components
+  #     - store: store_balances
+  #       mode: deltas
+  #   output:
+  #     type: proto:tycho.evm.v1.BlockChanges
+  - name: map_pools_created
+    kind: map
+    initialBlock: 1
+    inputs:
+      - params: string
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:tycho.evm.v1.BlockChanges
+
+  - name: store_pools
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: proto:tycho.evm.eulerswap.v1.Pool
+    inputs:
+      - map: map_pools_created
+
+  - name: map_pool_events
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - map: map_pools_created
+      - store: store_pools
+    output:
+      type: proto:tycho.evm.v1.BlockChanges
+
+params:
+  map_pools_created: factory_address=5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f&protocol_type_name=eulerswap_v1_pool

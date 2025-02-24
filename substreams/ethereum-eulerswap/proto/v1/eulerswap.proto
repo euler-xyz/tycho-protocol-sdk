@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package tycho.evm.eulerswap.v1;
+
+message Pools {
+  repeated Pool pools = 1;
+}
+
+message Pool {
+  bytes address = 1;
+  bytes asset0 = 2;
+  bytes asset1 = 3;
+  bytes vault0 = 4;
+  bytes vault1 = 5;
+  bytes swap_account = 6;
+  string fee = 7;
+  string price_x = 8;
+  string price_y = 9;
+  string concentration_x = 10;
+  string concentration_y = 11;
+  string debt_limit0 = 12;
+  string debt_limit1 = 13;
+  bytes created_tx_hash = 14;
+}
+
+message Events {
+  repeated Event events = 1;
+}
+
+message Event {
+  oneof type {
+    PoolDeployedEvent pool_deployed = 10;
+    SwapEvent swap = 20;
+  }
+
+  string hash = 100;
+  uint32 log_index = 101;
+  uint64 log_ordinal = 102;
+  string to = 103;
+  string from = 104;
+  uint64 block_number = 105;
+  uint64 timestamp = 106;
+  string pool = 107;
+}
+
+message PoolDeployedEvent {
+  bytes asset0 = 1;
+  bytes asset1 = 2;
+  string fee_multiplier = 3;
+  bytes swap_account = 4;
+  string price_x = 5;
+  string price_y = 6;
+  string concentration_x = 7;
+  string concentration_y = 8;
+  bytes pool = 9;
+}
+
+message SwapEvent {
+  bytes sender = 1;
+  string amount0_in = 2;
+  string amount1_in = 3;
+  string amount0_out = 4;
+  string amount1_out = 5;
+  string reserve0 = 6;
+  string reserve1 = 7;
+  bytes to = 8;
+}
