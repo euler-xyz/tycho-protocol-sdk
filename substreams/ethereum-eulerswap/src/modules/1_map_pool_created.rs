@@ -55,7 +55,7 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
                         change: ChangeType::Creation.into(),
                     },
                 ],
-            }],
+            }],    
             component_changes: vec![ProtocolComponent {
                 id: event.pool.to_hex(),
                 tokens: vec![event.asset0.clone(), event.asset1.clone()],
@@ -64,6 +64,31 @@ fn get_pools(block: &eth::Block, new_pools: &mut Vec<TransactionChanges>, params
                     Attribute {
                         name: "feeMultiplier".to_string(),
                         value: event.fee_multiplier.clone().to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    Attribute {
+                        name: "price_x".to_string(),
+                        value: event.price_x.clone().to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    Attribute {
+                        name: "price_y".to_string(),
+                        value: event.price_y.clone().to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    Attribute {
+                        name: "concentration_x".to_string(),
+                        value: event.concentration_x.clone().to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    Attribute {
+                        name: "concentration_y".to_string(),
+                        value: event.concentration_y.clone().to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    Attribute {
+                        name: "swap_account".to_string(),
+                        value: event.swap_account.clone(),
                         change: ChangeType::Creation.into(),
                     },
                     Attribute {

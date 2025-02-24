@@ -184,8 +184,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         uint256 shares = IEVault(vault).balanceOf(swapAccount);
 
         return shares == 0 ? 0 : IEVault(vault).convertToAssets(shares);
-
-        // return IEVault(vault).maxWithdraw(swapAccount);
     }
 }
 
