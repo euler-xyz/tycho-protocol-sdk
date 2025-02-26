@@ -19,22 +19,6 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 
     /// @inheritdoc ISwapAdapter
-    function price(
-        bytes32 poolId,
-        address sellToken,
-        address buyToken,
-        uint256[] memory specifiedAmounts
-    ) external view override returns (Fraction[] memory prices) {
-        prices = new Fraction[](specifiedAmounts.length);
-
-        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-            prices[i] =
-                quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
-        }
-    }
-
-    /// @inheritdoc ISwapAdapter
     function swap(
         bytes32 poolId,
         address sellToken,
@@ -71,6 +55,22 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 
     /// @inheritdoc ISwapAdapter
+    function price(
+        bytes32 poolId,
+        address sellToken,
+        address buyToken,
+        uint256[] memory specifiedAmounts
+    ) external view override returns (Fraction[] memory prices) {
+        prices = new Fraction[](specifiedAmounts.length);
+
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
+        for (uint256 i = 0; i < specifiedAmounts.length; i++) {
+            prices[i] =
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
+        }
+    }
+
+    /// @inheritdoc ISwapAdapter
     function getLimits(bytes32 poolId, address sellToken, address buyToken)
         external
         view
@@ -94,19 +94,6 @@ contract EulerSwapAdapter is ISwapAdapter {
             limits[0] = r1;
             limits[1] = r0;
         }
-    }
-
-    /// @inheritdoc ISwapAdapter
-    function getCapabilities(bytes32, address, address)
-        external
-        pure
-        override
-        returns (Capability[] memory capabilities)
-    {
-        capabilities = new Capability[](3);
-        capabilities[0] = Capability.SellOrder;
-        capabilities[1] = Capability.BuyOrder;
-        capabilities[2] = Capability.PriceFunction;
     }
 
     /// @inheritdoc ISwapAdapter
@@ -137,6 +124,19 @@ contract EulerSwapAdapter is ISwapAdapter {
         for (uint256 i = 0; i < ids.length; i++) {
             ids[i] = bytes20(factory.allPools(offset + i));
         }
+    }
+
+    /// @inheritdoc ISwapAdapter
+    function getCapabilities(bytes32, address, address)
+        external
+        pure
+        override
+        returns (Capability[] memory capabilities)
+    {
+        capabilities = new Capability[](3);
+        capabilities[0] = Capability.SellOrder;
+        capabilities[1] = Capability.BuyOrder;
+        capabilities[2] = Capability.PriceFunction;
     }
 
     /// @notice Calculates pool prices for specified amounts
