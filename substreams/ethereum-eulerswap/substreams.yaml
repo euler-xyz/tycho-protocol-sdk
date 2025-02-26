@@ -59,9 +59,9 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
       - map: map_protocol_components
-      - map: map_relative_component_balance
       - store: store_protocol_components
       - store: store_balances
         mode: deltas
+      - map: map_relative_component_balance
     output:
       type: proto:tycho.evm.v1.BlockChanges

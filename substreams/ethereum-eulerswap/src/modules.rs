@@ -75,22 +75,13 @@ fn map_protocol_components(block: eth::v2::Block) -> Result<BlockTransactionProt
 
 /// Stores all protocol components in a store.
 ///
-/// Stores information about components in a key value store. This is only necessary if
-/// you need to access the whole set of components within your indexing logic.
-///
-/// Popular use cases are:
-/// - Checking if a contract belongs to a component. In this case suggest to use an address as the
-///   store key so lookup operations are O(1).
-/// - Tallying up relative balances changes to calcualte absolute erc20 token balances per
-///   component.
-///
-/// Usually you can skip this step if:
-/// - You are interested in a static set of components only
-/// - Your protocol emits balance change events with absolute values
+/// Creates a mapping between pool addresses and their corresponding pool IDs,
+/// allowing efficient lookups of pool IDs when only the address is known.
+/// The store uses the format "pool:0xADDRESS" as the key.
 #[substreams::handlers::store]
 fn store_protocol_components(
     map_protocol_components: BlockTransactionProtocolComponents,
-    store: StoreSetRaw,
+    store: StoreSetString,
 ) {
     map_protocol_components
         .tx_components
@@ -100,12 +91,9 @@ fn store_protocol_components(
                 .components
                 .into_iter()
                 .for_each(|pc| {
-                    // Assumes that the component id is a hex encoded contract address
-                    let key = pc.id.clone();
-                    // we store the components tokens
-                    // TODO: proper error handling
-                    let val = serde_sibor::to_bytes(&pc.tokens).unwrap();
-                    store.set(0, key, &val);
+                    // Store using format "pool:0xADDRESS" -> full pool ID
+                    // For Eulerswap, the id is already the pool address
+                    store.set(0, format!("pool:{0}", &pc.id[..42]), &pc.id);
                 })
         });
 }
@@ -126,37 +114,35 @@ fn store_protocol_components(
 #[substreams::handlers::map]
 fn map_relative_component_balance(
     block: eth::v2::Block,
-    store: StoreGetRaw,
+    store: StoreGetString,
 ) -> Result<BlockBalanceDeltas> {
     let res = block
         .logs()
         .filter_map(|log| {
             erc20::events::Transfer::match_and_decode(log).map(|transfer| {
-                let to_addr = hex::encode(transfer.to.as_slice());
-                let from_addr = hex::encode(transfer.from.as_slice());
+                let to_addr_hex = hex::encode(transfer.to.as_slice());
+                let from_addr_hex = hex::encode(transfer.from.as_slice());
                 let tx = log.receipt.transaction;
-                if let Some(val) = store.get_last(&to_addr) {
-                    let component_tokens: Vec<Vec<u8>> = serde_sibor::from_bytes(&val).unwrap();
-                    if component_tokens.contains(&log.address().to_vec()) {
-                        return Some(BalanceDelta {
-                            ord: log.ordinal(),
-                            tx: Some(tx.into()),
-                            token: log.address().to_vec(),
-                            delta: transfer.value.to_signed_bytes_be(),
-                            component_id: to_addr.into_bytes(),
-                        });
-                    }
-                } else if let Some(val) = store.get_last(&from_addr) {
-                    let component_tokens: Vec<Vec<u8>> = serde_sibor::from_bytes(&val).unwrap();
-                    if component_tokens.contains(&log.address().to_vec()) {
-                        return Some(BalanceDelta {
-                            ord: log.ordinal(),
-                            tx: Some(tx.into()),
-                            token: log.address().to_vec(),
-                            delta: (transfer.value.neg()).to_signed_bytes_be(),
-                            component_id: to_addr.into_bytes(),
-                        });
-                    }
+                
+                // Check if receiver is a known pool
+                if let Some(_) = store.get_last(format!("pool:0x{}", to_addr_hex)) {
+                    return Some(BalanceDelta {
+                        ord: log.ordinal(),
+                        tx: Some(tx.into()),
+                        token: log.address().to_vec(),
+                        delta: transfer.value.to_signed_bytes_be(),
+                        component_id: format!("0x{}", to_addr_hex).into_bytes(),
+                    });
+                } 
+                // Check if sender is a known pool
+                else if let Some(_) = store.get_last(format!("pool:0x{}", from_addr_hex)) {
+                    return Some(BalanceDelta {
+                        ord: log.ordinal(),
+                        tx: Some(tx.into()),
+                        token: log.address().to_vec(),
+                        delta: (transfer.value.neg()).to_signed_bytes_be(),
+                        component_id: format!("0x{}", from_addr_hex).into_bytes(),
+                    });
                 }
                 None
             })
@@ -191,7 +177,7 @@ pub fn store_balances(deltas: BlockBalanceDeltas, store: StoreAddBigInt) {
 fn map_protocol_changes(
     block: eth::v2::Block,
     new_components: BlockTransactionProtocolComponents,
-    components_store: StoreGetRaw,
+    components_store: StoreGetString,
     balance_store: StoreDeltas,
     deltas: BlockBalanceDeltas,
 ) -> Result<BlockChanges, substreams::errors::Error> {
@@ -216,14 +202,23 @@ fn map_protocol_changes(
                 .iter()
                 .for_each(|component| {
                     builder.add_protocol_component(component);
-                    // TODO: In case you require to add any dynamic attributes to the
-                    //  component you can do so here:
-                    /*
-                        builder.add_entity_change(&EntityChanges {
-                            component_id: component.id.clone(),
-                            attributes: default_attributes.clone(),
-                        });
-                    */
+                    // Add default attributes for Eulerswap pools
+                    builder.add_entity_change(&EntityChanges {
+                        component_id: component.id.clone(),
+                        attributes: vec![
+                            // TODO: check this, as tokens are held in vaults, and vault shares are held by swap account
+                            Attribute {
+                                name: "balance_owner".to_string(),
+                                value: component.id[2..42].as_bytes().to_vec(),
+                                change: ChangeType::Creation.into(),
+                            },
+                            Attribute {
+                                name: "update_marker".to_string(),
+                                value: vec![1u8],
+                                change: ChangeType::Creation.into(),
+                            },
+                        ],
+                    });
                 });
         });
 
@@ -247,12 +242,9 @@ fn map_protocol_changes(
     extract_contract_changes_builder(
         &block,
         |addr| {
-            // we assume that the store holds contract addresses as keys and if it
-            // contains a value, that contract is of relevance.
-            // TODO: if you have any additional static contracts that need to be indexed,
-            //  please add them here.
+            // Check if this address belongs to a known pool
             components_store
-                .get_last(hex::encode(addr))
+                .get_last(format!("pool:0x{}", hex::encode(addr)))
                 .is_some()
         },
         &mut transaction_changes,
