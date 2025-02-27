@@ -1,0 +1,102 @@
+[
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "evc_",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "quoteExactInput",
+      "inputs": [
+        {
+          "name": "eulerSwap",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "tokenIn",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "tokenOut",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amountIn",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "quoteExactOutput",
+      "inputs": [
+        {
+          "name": "eulerSwap",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "tokenIn",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "tokenOut",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amountOut",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "error",
+      "name": "InsufficientCash",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InsufficientReserves",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "OperatorNotInstalled",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "UnsupportedPair",
+      "inputs": []
+    }
+  ]
+  
