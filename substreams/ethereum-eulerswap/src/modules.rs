@@ -115,19 +115,20 @@ fn store_protocol_components(
         });
 }
 
-/// Extracts balance changes per component
+/// Extracts balance changes per component by tracking Swap events
 ///
-/// This template function uses ERC20 transfer events to extract balance changes. It
-/// assumes that each component is deployed at a dedicated contract address. If a
-/// transfer to the component is detected, it's balanced is increased and if a balance
-/// from the component is detected its balance is decreased.
+/// This function tracks balance changes in EulerSwap pools by monitoring Swap events.
+/// When a swap occurs, it records:
+/// - Positive deltas for tokens being swapped in (amount0In, amount1In)
+/// - Negative deltas for tokens being swapped out (amount0Out, amount1Out)
 ///
-/// ## Note:
-/// Changes are necessary if your protocol uses native ETH, uses a vault contract or if
-/// your component burn or mint tokens without emitting transfer events.
+/// The function relies on the store to:
+/// 1. Verify the swap event came from a valid EulerSwap pool
+/// 2. Look up the token addresses associated with each pool
 ///
-/// You may want to ignore LP tokens if your protocol emits transfer events for these
-/// here.
+/// The resulting deltas represent the net token movements for each pool component.
+/// Note: This does not track direct ERC20 transfers to the pool or changes in the lending vaults,
+/// only the token movements from swap events.
 #[substreams::handlers::map]
 fn map_relative_component_balance(
     block: eth::v2::Block,
@@ -142,7 +143,7 @@ fn map_relative_component_balance(
             if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log) {
                 // Get the pool address from the log emitter
                 let pool_address = hex::encode(log.address());
-                
+                                
                 // Check if the log emitter is a known pool
                 if store.get_last(format!("pool:0x{}", pool_address)).is_some() {
                     let component_id = format!("0x{}", pool_address).into_bytes();
