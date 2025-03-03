@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use substreams::{pb::substreams::StoreDeltas, prelude::*};
 use substreams_ethereum::{pb::eth, Event};
 use tycho_substreams::{
-    abi::erc20, balances::aggregate_balances_changes, contract::extract_contract_changes_builder,
+    balances::aggregate_balances_changes, contract::extract_contract_changes_builder,
     prelude::*,
 };
 
@@ -94,6 +94,23 @@ fn store_protocol_components(
                     // Store using format "pool:0xADDRESS" -> full pool ID
                     // For Eulerswap, the id is already the pool address
                     store.set(0, format!("pool:{0}", &pc.id[..42]), &pc.id);
+                    
+                    // Store token addresses if available (index 0 and 1 in the tokens array)
+                    if pc.tokens.len() >= 2 {
+                        // Store asset0 (token 0)
+                        store.set(
+                            0,
+                            format!("pool:{}:asset0", &pc.id[..42]),
+                            &format!("0x{}", hex::encode(&pc.tokens[0])),
+                        );
+                        
+                        // Store asset1 (token 1)
+                        store.set(
+                            0,
+                            format!("pool:{}:asset1", &pc.id[..42]),
+                            &format!("0x{}", hex::encode(&pc.tokens[1])),
+                        );
+                    }
                 })
         });
 }
@@ -116,41 +133,79 @@ fn map_relative_component_balance(
     block: eth::v2::Block,
     store: StoreGetString,
 ) -> Result<BlockBalanceDeltas> {
-    let res = block
+    let deltas = block
         .logs()
-        .filter_map(|log| {
-            erc20::events::Transfer::match_and_decode(log).map(|transfer| {
-                let to_addr_hex = hex::encode(transfer.to.as_slice());
-                let from_addr_hex = hex::encode(transfer.from.as_slice());
-                let tx = log.receipt.transaction;
+        .flat_map(|log| {
+            let mut deltas = Vec::new();
+            
+            // Try to decode the Swap event
+            if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log) {
+                // Get the pool address from the log emitter
+                let pool_address = hex::encode(log.address());
                 
-                // Check if receiver is a known pool
-                if let Some(_) = store.get_last(format!("pool:0x{}", to_addr_hex)) {
-                    return Some(BalanceDelta {
-                        ord: log.ordinal(),
-                        tx: Some(tx.into()),
-                        token: log.address().to_vec(),
-                        delta: transfer.value.to_signed_bytes_be(),
-                        component_id: format!("0x{}", to_addr_hex).into_bytes(),
-                    });
-                } 
-                // Check if sender is a known pool
-                else if let Some(_) = store.get_last(format!("pool:0x{}", from_addr_hex)) {
-                    return Some(BalanceDelta {
-                        ord: log.ordinal(),
-                        tx: Some(tx.into()),
-                        token: log.address().to_vec(),
-                        delta: (transfer.value.neg()).to_signed_bytes_be(),
-                        component_id: format!("0x{}", from_addr_hex).into_bytes(),
-                    });
+                // Check if the log emitter is a known pool
+                if store.get_last(format!("pool:0x{}", pool_address)).is_some() {
+                    let component_id = format!("0x{}", pool_address).into_bytes();
+                    
+                    // Get token addresses from the store and the event
+                    if let Some(asset0) = store.get_last(format!("pool:0x{}:asset0", pool_address)) {
+                        if let Some(asset1) = store.get_last(format!("pool:0x{}:asset1", pool_address)) {
+                            let asset0_bytes = hex::decode(&asset0[2..]).unwrap_or_default();
+                            let asset1_bytes = hex::decode(&asset1[2..]).unwrap_or_default();
+                            
+                            // Add amount0In as a positive delta if > 0
+                            if swap_event.amount0_in > substreams::scalar::BigInt::from(0) {
+                                deltas.push(BalanceDelta {
+                                    ord: log.ordinal(),
+                                    tx: Some(log.receipt.transaction.into()),
+                                    token: asset0_bytes.clone(),
+                                    delta: swap_event.amount0_in.to_signed_bytes_be(),
+                                    component_id: component_id.clone(),
+                                });
+                            }
+                            
+                            // Add amount1In as a positive delta if > 0
+                            if swap_event.amount1_in > substreams::scalar::BigInt::from(0) {
+                                deltas.push(BalanceDelta {
+                                    ord: log.ordinal(),
+                                    tx: Some(log.receipt.transaction.into()),
+                                    token: asset1_bytes.clone(),
+                                    delta: swap_event.amount1_in.to_signed_bytes_be(),
+                                    component_id: component_id.clone(),
+                                });
+                            }
+                            
+                            // Add amount0Out as a negative delta if > 0
+                            if swap_event.amount0_out > substreams::scalar::BigInt::from(0) {
+                                deltas.push(BalanceDelta {
+                                    ord: log.ordinal(),
+                                    tx: Some(log.receipt.transaction.into()),
+                                    token: asset0_bytes.clone(),
+                                    delta: swap_event.amount0_out.neg().to_signed_bytes_be(),
+                                    component_id: component_id.clone(),
+                                });
+                            }
+                            
+                            // Add amount1Out as a negative delta if > 0
+                            if swap_event.amount1_out > substreams::scalar::BigInt::from(0) {
+                                deltas.push(BalanceDelta {
+                                    ord: log.ordinal(),
+                                    tx: Some(log.receipt.transaction.into()),
+                                    token: asset1_bytes.clone(),
+                                    delta: swap_event.amount1_out.neg().to_signed_bytes_be(),
+                                    component_id: component_id.clone(),
+                                });
+                            }
+                        }
+                    }
                 }
-                None
-            })
+            }
+            
+            deltas
         })
-        .flatten()
         .collect::<Vec<_>>();
 
-    Ok(BlockBalanceDeltas { balance_deltas: res })
+    Ok(BlockBalanceDeltas { balance_deltas: deltas })
 }
 
 /// Aggregates relative balances values into absolute values
