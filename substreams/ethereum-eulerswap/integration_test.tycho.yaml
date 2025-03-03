@@ -1,11 +1,11 @@
 # Name of the substreams config file in your substreams module. Usually "./substreams.yaml"
 substreams_yaml_path: ./substreams.yaml
 # Name of the adapter contract, usually: ProtocolSwapAdapter"
-adapter_contract: "SwapAdapter"
+adapter_contract: "EulerSwapAdapter"
 # Constructor signature of the Adapter contract"
-adapter_build_signature: "constructor(address)"
+adapter_build_signature: "constructor(address,address)"
 # A comma separated list of args to be passed to the contructor of the Adapter contract"
-adapter_build_args: "0x0000000000000000000000000000000000000000"
+adapter_build_args: "0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8,0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE"
 # Whether or not the testing script should skip checking balances of the protocol components.
 # If set to `true` please always add a reason why it's skipped.
 skip_balance_check: false
@@ -14,44 +14,49 @@ skip_balance_check: false
 # Please note that this component needs to be indexed by your substreams module, this feature is only for testing purpose.
 # Also please always add a reason why this account is needed for your tests.
 # This will be applied to each test.
-initialized_accounts:
-  - "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" # Needed for ....
+# initialized_accounts:
+#   - "0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8" # EulerSwapFactory, actually not needed for this test
+#   - "0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE" # EulerSwapPerihpery, actually not needed for this test
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
-  - "type_name_1"
-  - "type_name_2"
+  - "eulerswap"
 # A list of tests.
 tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 123
-    stop_block: 456
+    start_block: 21923450
+    stop_block: 21923470
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
-      - "0x0c0e5f2fF0ff18a3be9b835635039256dC4B4963" # Needed for ....
+      - "0xa66957e58b60d6b92b850c8773a9ff9b0ba96a65" # This is the USDC vault in Euler lending protocol that will hold the USDC for the pool
+      - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7"
+      - id: "0x67C30405250e395f31d661274352dA404e624682"
         tokens:
-          - "0xdac17f958d2ee523a2206206994597c13d831ec7"
-          - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-          - "0x6b175474e89094c44da98b954eedeac495271d0f"
+          - "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+          - "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         static_attributes:
-          attr_1: "value"
-          attr_2: "value"
-        creation_tx: "0x20793bbf260912aae189d5d261ff003c9b9166da8191d8f9d63ff1c7722f3ac6"
+          pool_type: "0x45756c657253776170"
+          swap_account: "0x603765f9e9b8e3cbacbdf7a6e963b7ead77ae86f"
+          fee_multiplier: "0x0de0b6b3a7640000"
+          price_x: "0x0de0b6b3a7640000"
+          price_y: "0x0de0b6b3a7640000"
+          concentration_x: "0x0d7621dc58210000"
+          concentration_y: "0x0d7621dc58210000"
+        creation_tx: "0xb0a243654ee544a0d31218646e3fb2a475c32bf91f86e82755194213ca4ef680"
         # Whether or not the script should skip trying to simulate a swap on this component.
         # If set to `true` please always add a reason why it's skipped.
         skip_simulation: false
-  - name: test_something_else
-    start_block: 123
-    stop_block: 456
-    expected_components:
-      - id: "0xdc24316b9ae028f1497c275eb9192a3ea0f67022"
-        tokens:
-          - "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-          - "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
-        static_attributes: null
-        creation_tx: "0xfac67ecbd423a5b915deff06045ec9343568edaec34ae95c43d35f2c018afdaa"
-        skip_simulation: true # If true, always add a reason
+  # - name: test_something_else
+  #   start_block: 123
+  #   stop_block: 456
+  #   expected_components:
+  #     - id: "0xdc24316b9ae028f1497c275eb9192a3ea0f67022"
+  #       tokens:
+  #         - "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+  #         - "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+  #       static_attributes: null
+  #       creation_tx: "0xfac67ecbd423a5b915deff06045ec9343568edaec34ae95c43d35f2c018afdaa"
+  #       skip_simulation: true # If true, always add a reason

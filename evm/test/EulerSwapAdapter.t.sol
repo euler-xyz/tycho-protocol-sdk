@@ -70,6 +70,28 @@ contract EulerSwapAdapterTest is AdapterTest {
         assertEq(prices[2].denominator, specifiedAmounts[2]);
     }
 
+    function testFuzzPrice(uint256 specifiedAmount) public view {
+        // Assume OrderSide.Sell
+        uint256[] memory limits =
+            adapter.getLimits(bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT);
+
+        vm.assume(specifiedAmount > 0);
+        vm.assume(specifiedAmount < limits[0]);
+
+        console2.log("specifiedAmount", specifiedAmount);
+
+        uint256[] memory specifiedAmounts = new uint256[](1);
+        specifiedAmounts[0] = specifiedAmount;
+
+        // Fraction[] memory prices = adapter.price(
+        //     bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT, specifiedAmounts
+        // );
+
+        // assertGt(prices[0].numerator, 0);
+        // assertGt(prices[0].denominator, 0);
+    }
+
+
     function testGetLimits() public view {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
         uint256[] memory limits = adapter.getLimits(poolId, USDC, USDT);
