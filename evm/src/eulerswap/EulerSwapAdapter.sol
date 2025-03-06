@@ -2,6 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {ISwapAdapter} from "src/interfaces/ISwapAdapter.sol";
+import {IEulerSwap} from "src/eulerswap/IEulerSwap.sol";
+import {IEulerSwapFactory} from "src/eulerswap/IEulerSwapFactory.sol";
+import {IEulerSwapPeriphery} from "src/eulerswap/IEulerSwapPeriphery.sol";
 import {
     IERC20,
     SafeERC20
@@ -78,22 +81,9 @@ contract EulerSwapAdapter is ISwapAdapter {
         returns (uint256[] memory limits)
     {
         limits = new uint256[](2);
-        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        address swapAccount = pool.myAccount();
+        address pool = address(bytes20(poolId));
 
-        IEVC evc = IEVC(IEVault(pool.vault0()).EVC());
-        if (!evc.isAccountOperatorAuthorized(swapAccount, address(pool))) {
-            return limits;
-        }
-
-        (uint256 r0, uint256 r1,) = pool.getReserves();
-        if (sellToken < buyToken) {
-            limits[0] = r0;
-            limits[1] = r1;
-        } else {
-            limits[0] = r1;
-            limits[1] = r0;
-        }
+        (limits[0], limits[1]) = periphery.getLimits(pool, sellToken, buyToken);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -167,121 +157,4 @@ contract EulerSwapAdapter is ISwapAdapter {
             )
         );
     }
-
-    function vaultBalance(address vault, address swapAccount)
-        internal
-        view
-        returns (uint256)
-    {
-        uint256 shares = IEVault(vault).balanceOf(swapAccount);
-
-        return shares == 0 ? 0 : IEVault(vault).convertToAssets(shares);
-    }
-}
-
-interface IEulerSwapFactory {
-    struct DeployParams {
-        address vault0;
-        address vault1;
-        address swapAccount;
-        uint256 fee;
-        uint256 priceX;
-        uint256 priceY;
-        uint256 concentrationX;
-        uint256 concentrationY;
-        uint112 debtLimit0;
-        uint112 debtLimit1;
-    }
-
-    function deployPool(DeployParams memory params)
-        external
-        returns (address);
-
-    function allPools(uint256 index) external view returns (address);
-    function getPool(bytes32 poolKey) external view returns (address);
-    function allPoolsLength() external view returns (uint256);
-    function getAllPoolsListSlice(uint256 start, uint256 end)
-        external
-        view
-        returns (address[] memory);
-}
-
-interface IEulerSwap {
-    struct Params {
-        address vault0;
-        address vault1;
-        address myAccount;
-        uint112 debtLimit0;
-        uint112 debtLimit1;
-        uint256 fee;
-    }
-
-    struct CurveParams {
-        uint256 priceX;
-        uint256 priceY;
-        uint256 concentrationX;
-        uint256 concentrationY;
-    }
-
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) external;
-    function activate() external;
-
-    function verify(uint256 newReserve0, uint256 newReserve1)
-        external
-        view
-        returns (bool);
-    function curve() external view returns (bytes32);
-    function vault0() external view returns (address);
-    function vault1() external view returns (address);
-    function asset0() external view returns (address);
-    function asset1() external view returns (address);
-    function myAccount() external view returns (address);
-    function initialReserve0() external view returns (uint112);
-    function initialReserve1() external view returns (uint112);
-    function feeMultiplier() external view returns (uint256);
-    function getReserves()
-        external
-        view
-        returns (uint112 reserve0, uint112 reserve1, uint32 status);
-    function priceX() external view returns (uint256);
-    function priceY() external view returns (uint256);
-    function concentrationX() external view returns (uint256);
-    function concentrationY() external view returns (uint256);
-}
-
-interface IEulerSwapPeriphery {
-    /// @notice How much `tokenOut` can I get for `amountIn` of `tokenIn`?
-    function quoteExactInput(
-        address eulerSwap,
-        address tokenIn,
-        address tokenOut,
-        uint256 amountIn
-    ) external view returns (uint256);
-
-    /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`?
-    function quoteExactOutput(
-        address eulerSwap,
-        address tokenIn,
-        address tokenOut,
-        uint256 amountOut
-    ) external view returns (uint256);
-}
-
-interface IEVault {
-    function EVC() external view returns (address);
-    function balanceOf(address account) external view returns (uint256);
-    function convertToAssets(uint256 shares) external view returns (uint256);
-    function maxWithdraw(address owner) external view returns (uint256);
-}
-
-interface IEVC {
-    function isAccountOperatorAuthorized(address account, address operator)
-        external
-        view
-        returns (bool authorized);
 }

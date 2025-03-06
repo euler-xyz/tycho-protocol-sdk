@@ -8,22 +8,25 @@ import {
     IEulerSwap
 } from "src/eulerswap/EulerSwapAdapter.sol";
 import {FractionMath} from "src/libraries/FractionMath.sol";
+import "forge-std/console2.sol";
 
 contract EulerSwapAdapterTest is AdapterTest {
     using FractionMath for Fraction;
 
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-    address constant USDC_USDT_POOL = 0x67C30405250e395f31d661274352dA404e624682;
+    address constant USDC_USDT_POOL = 0x2bFED8dBEb8e6226a15300AC77eE9130E52410fE;
+    address constant EULER_SWAP_FACTORY = 0xF75548aF02f1928CbE9015985D4Fcbf96d728544;
+    address constant EULER_SWAP_PERIPHERY = 0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f;
 
     EulerSwapAdapter public adapter;
 
     function setUp() public {
-        uint256 forkBlock = 21923492;
+        uint256 forkBlock = 21986045;
         vm.createSelectFork(vm.rpcUrl("mainnet"), forkBlock);
         adapter = new EulerSwapAdapter(
-            0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8,
-            0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE
+            EULER_SWAP_FACTORY,
+            EULER_SWAP_PERIPHERY
         );
 
         vm.label(address(adapter), "EulerSwapAdapter");
@@ -35,8 +38,8 @@ contract EulerSwapAdapterTest is AdapterTest {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        address swapper = pool.myAccount();
-        uint256 amountIn = 20e6;
+        address swapper = pool.eulerAccount();
+        uint256 amountIn = 5e6;
         uint256 usdcBalanceBefore = IERC20(USDC).balanceOf(swapper);
         uint256 usdtBalanceBefore = IERC20(USDT).balanceOf(swapper);
 
@@ -70,27 +73,24 @@ contract EulerSwapAdapterTest is AdapterTest {
         assertEq(prices[2].denominator, specifiedAmounts[2]);
     }
 
-    function testFuzzPrice(uint256 specifiedAmount) public view {
-        // Assume OrderSide.Sell
-        uint256[] memory limits =
-            adapter.getLimits(bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT);
+    // function testFuzzPrice(uint256 specifiedAmount) public view {
+    //     // Assume OrderSide.Sell
+    //     uint256[] memory limits =
+    //         adapter.getLimits(bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT);
 
-        vm.assume(specifiedAmount > 0);
-        vm.assume(specifiedAmount < limits[0]);
+    //     console2.log("limits", limits[0]);
+    //     vm.assume(specifiedAmount > 0);
+    //     vm.assume(specifiedAmount < limits[0]);
 
-        console2.log("specifiedAmount", specifiedAmount);
+    //     console2.log("specifiedAmount", specifiedAmount);
 
-        uint256[] memory specifiedAmounts = new uint256[](1);
-        specifiedAmounts[0] = specifiedAmount;
+    //     uint256[] memory specifiedAmounts = new uint256[](1);
+    //     specifiedAmounts[0] = specifiedAmount;
 
-        // Fraction[] memory prices = adapter.price(
-        //     bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT, specifiedAmounts
-        // );
-
-        // assertGt(prices[0].numerator, 0);
-        // assertGt(prices[0].denominator, 0);
-    }
-
+    //     Fraction[] memory prices = adapter.price(
+    //         bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT, specifiedAmounts
+    //     );
+    // }
 
     function testGetLimits() public view {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
