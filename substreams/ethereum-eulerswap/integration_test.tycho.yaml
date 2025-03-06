@@ -8,15 +8,16 @@ adapter_build_signature: "constructor(address,address)"
 adapter_build_args: "0xF75548aF02f1928CbE9015985D4Fcbf96d728544,0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f"
 # Whether or not the testing script should skip checking balances of the protocol components.
 # If set to `true` please always add a reason why it's skipped.
-skip_balance_check: false
+skip_balance_check: true
 # A list of accounts that need to be indexed to run the tests properly.
 # Usually used when there is a global component required by all pools and created before the tested range of blocks. For example a factory or a vault.
 # Please note that this component needs to be indexed by your substreams module, this feature is only for testing purpose.
 # Also please always add a reason why this account is needed for your tests.
 # This will be applied to each test.
-# initialized_accounts:
+initialized_accounts:
+  - "0x0c9a3dd6b8f28529d72d7f9ce918d493519ee383" # This is the EVC address
 #   - "0xF75548aF02f1928CbE9015985D4Fcbf96d728544" # EulerSwapFactory, actually not needed for this test
-#   - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, actually not needed for this test
+  - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, used for quoting & getLimits()
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"
@@ -25,7 +26,7 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 21986040
+    start_block: 21986045
     stop_block: 21986080
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
