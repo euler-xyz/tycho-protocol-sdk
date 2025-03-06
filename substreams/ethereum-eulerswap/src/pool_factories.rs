@@ -1,9 +1,15 @@
 use substreams::hex;
 use substreams_ethereum::pb::eth::v2::{Call, Log, TransactionTrace};
-use tycho_substreams::models::{
-    ChangeType, FinancialType, ImplementationType, ProtocolComponent, ProtocolType,
+use tycho_substreams::{
+    attributes::json_serialize_bigint_list,
+    models::{ImplementationType, ProtocolComponent},
 };
 use substreams_ethereum::{Event, Function};
+
+/// Format a pool ID consistently
+pub fn format_pool_id(pool_address: &[u8]) -> String {
+    format!("0x{}", hex::encode(pool_address))
+}
 
 /// Attempts to create a new ProtocolComponent from a EulerSwap pool deployment
 ///
@@ -29,73 +35,57 @@ pub fn maybe_create_component(
             let _deploy_call = crate::abi::eulerswap_factory::functions::DeployPool::match_and_decode(call)?;
             // Try to decode the PoolDeployed event
             let pool_deployed = crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log)?;
+            
+            // Format reserves for attributes
+            let reserves = vec![
+                pool_deployed.reserve0.clone(),
+                pool_deployed.reserve1.clone()
+            ];
+            
+            // Format prices
+            let prices = vec![
+                pool_deployed.price_x.clone(),
+                pool_deployed.price_y.clone()
+            ];
+            
+            // Format concentrations
+            let concentrations = vec![
+                pool_deployed.concentration_x.clone(),
+                pool_deployed.concentration_y.clone()
+            ];
 
-            Some(ProtocolComponent {
-                id: format!("0x{}", hex::encode(&pool_deployed.pool)),
-                tokens: vec![
-                    pool_deployed.asset0.clone(),  // First token
-                    pool_deployed.asset1.clone(),  // Second token
-                ],
-                contracts: vec![
-                    pool_deployed.pool.clone(),          // The deployed pool contract
-                    pool_deployed.vault0.clone(),        // Vault0 contract
-                    pool_deployed.vault1.clone(),        // Vault1 contract
-                ],
-                static_att: vec![
-                    tycho_substreams::models::Attribute {
-                        name: "pool_type".to_string(),
-                        value: "EulerSwap".as_bytes().to_vec(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "euler_account".to_string(),
-                        value: pool_deployed.euler_account.clone(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "fee_multiplier".to_string(),
-                        value: pool_deployed.fee_multiplier.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "reserve0".to_string(),
-                        value: pool_deployed.reserve0.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "reserve1".to_string(),
-                        value: pool_deployed.reserve1.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "price_x".to_string(),
-                        value: pool_deployed.price_x.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "price_y".to_string(),
-                        value: pool_deployed.price_y.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "concentration_x".to_string(),
-                        value: pool_deployed.concentration_x.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                    tycho_substreams::models::Attribute {
-                        name: "concentration_y".to_string(),
-                        value: pool_deployed.concentration_y.to_signed_bytes_be(),
-                        change: ChangeType::Creation.into(),
-                    },
-                ],
-                change: ChangeType::Creation.into(),
-                protocol_type: Some(ProtocolType {
-                    name: "eulerswap".to_string(),
-                    financial_type: FinancialType::Swap.into(),
-                    attribute_schema: vec![],
-                    implementation_type: ImplementationType::Vm.into(),
-                }),
-            })
+            // Create a ProtocolComponent with the proper ID
+            let mut component = ProtocolComponent::new(&format_pool_id(&pool_deployed.pool));
+            
+            // Add tokens
+            component = component.with_tokens(&[
+                pool_deployed.asset0.clone(),  // First token
+                pool_deployed.asset1.clone(),  // Second token
+            ]);
+            
+            // Add contracts
+            component = component.with_contracts(&[
+                pool_deployed.pool.clone(),     // The deployed pool contract
+                pool_deployed.vault0.clone(),   // Vault0 contract
+                pool_deployed.vault1.clone(),   // Vault1 contract
+            ]);
+            
+            // Add attributes
+            component = component.with_attributes(&[
+                ("pool_type", "EulerSwap".as_bytes()),
+                ("euler_account", &pool_deployed.euler_account),
+                ("fee_multiplier", &pool_deployed.fee_multiplier.to_signed_bytes_be()),
+                ("reserves", &json_serialize_bigint_list(&reserves)),
+                ("prices", &json_serialize_bigint_list(&prices)),
+                ("concentrations", &json_serialize_bigint_list(&concentrations)),
+                // Add update marker for consistency with other protocols
+                ("manual_updates", &[1u8]),
+            ]);
+            
+            // Set protocol type
+            component = component.as_swap_type("eulerswap", ImplementationType::Vm);
+            
+            Some(component)
         }
         _ => None,
     }

@@ -41,13 +41,11 @@ tests:
           pool_type: "0x45756c657253776170"
           euler_account: "0x603765f9e9b8e3cbacbdf7a6e963b7ead77ae86f"
           fee_multiplier: "0x0de0b6b3a7640000"
-          reserve0: "0x77359400"
-          reserve1: "0x77359400"
-          price_x: "0x0de0b6b3a7640000"
-          price_y: "0x0de0b6b3a7640000"
-          concentration_x: "0x0d7621dc58210000"
-          concentration_y: "0x0d7621dc58210000"
-        creation_tx: "0xb0a243654ee544a0d31218646e3fb2a475c32bf91f86e82755194213ca4ef680"
+          reserves: "0x5b2230783737333539343030222c2230783737333539343030225d"
+          prices: "0x5b22307830646530623662336137363430303030222c22307830646530623662336137363430303030225d"
+          concentrations: "0x5b22307830643736323164633538323130303030222c22307830643736323164633538323130303030225d"
+          manual_updates: "0x01"
+        creation_tx: "0x3202a00fef545ef75c85557a5f671a3546e1c1cbdfe3681b46f2e05eae09181a"
         # Whether or not the script should skip trying to simulate a swap on this component.
         # If set to `true` please always add a reason why it's skipped.
         skip_simulation: false
