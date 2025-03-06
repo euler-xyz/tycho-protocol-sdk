@@ -115,10 +115,10 @@ fn store_protocol_components(
         });
 }
 
-/// Extracts balance changes per component by tracking Swap events
+/// Maps token balance deltas for each EulerSwap pool component in a block
 ///
-/// This function tracks balance changes in EulerSwap pools by monitoring Swap events.
-/// When a swap occurs, it records:
+/// This function tracks:
+/// - Initial pool balances from PoolDeployed events (reserve0 and reserve1)
 /// - Positive deltas for tokens being swapped in (amount0In, amount1In)
 /// - Negative deltas for tokens being swapped out (amount0Out, amount1Out)
 ///
@@ -138,6 +138,43 @@ fn map_relative_component_balance(
         .logs()
         .flat_map(|log| {
             let mut deltas = Vec::new();
+            
+            // Try to decode the PoolDeployed event from the factory
+            if let Some(deploy_event) = crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log.log) {
+                // Get the pool address from the event
+                let pool_address = hex::encode(&deploy_event.pool);
+                
+                // Check if the pool is already in the store
+                if store.get_last(format!("pool:0x{}", pool_address)).is_some() {
+                    let component_id = format!("0x{}", pool_address).into_bytes();
+                    
+                    // Get token addresses from the event
+                    let asset0_bytes = deploy_event.asset0.clone();
+                    let asset1_bytes = deploy_event.asset1.clone();
+                    
+                    // Add reserve0 as the initial balance for asset0
+                    if deploy_event.reserve0 > substreams::scalar::BigInt::from(0) {
+                        deltas.push(BalanceDelta {
+                            ord: log.ordinal(),
+                            tx: Some(log.receipt.transaction.into()),
+                            token: asset0_bytes.clone(),
+                            component_id: component_id.clone(),
+                            delta: deploy_event.reserve0.to_signed_bytes_be(),
+                        });
+                    }
+                    
+                    // Add reserve1 as the initial balance for asset1
+                    if deploy_event.reserve1 > substreams::scalar::BigInt::from(0) {
+                        deltas.push(BalanceDelta {
+                            ord: log.ordinal(),
+                            tx: Some(log.receipt.transaction.into()),
+                            token: asset1_bytes.clone(),
+                            component_id: component_id.clone(),
+                            delta: deploy_event.reserve1.to_signed_bytes_be(),
+                        });
+                    }
+                }
+            }
             
             // Try to decode the Swap event
             if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log) {
@@ -160,8 +197,8 @@ fn map_relative_component_balance(
                                     ord: log.ordinal(),
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset0_bytes.clone(),
-                                    delta: swap_event.amount0_in.to_signed_bytes_be(),
                                     component_id: component_id.clone(),
+                                    delta: swap_event.amount0_in.to_signed_bytes_be(),
                                 });
                             }
                             
@@ -171,8 +208,8 @@ fn map_relative_component_balance(
                                     ord: log.ordinal(),
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset1_bytes.clone(),
-                                    delta: swap_event.amount1_in.to_signed_bytes_be(),
                                     component_id: component_id.clone(),
+                                    delta: swap_event.amount1_in.to_signed_bytes_be(),
                                 });
                             }
                             
@@ -182,8 +219,8 @@ fn map_relative_component_balance(
                                     ord: log.ordinal(),
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset0_bytes.clone(),
-                                    delta: swap_event.amount0_out.neg().to_signed_bytes_be(),
                                     component_id: component_id.clone(),
+                                    delta: swap_event.amount0_out.neg().to_signed_bytes_be(),
                                 });
                             }
                             
@@ -193,8 +230,8 @@ fn map_relative_component_balance(
                                     ord: log.ordinal(),
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset1_bytes.clone(),
-                                    delta: swap_event.amount1_out.neg().to_signed_bytes_be(),
                                     component_id: component_id.clone(),
+                                    delta: swap_event.amount1_out.neg().to_signed_bytes_be(),
                                 });
                             }
                         }
