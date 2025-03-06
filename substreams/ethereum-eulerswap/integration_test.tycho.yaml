@@ -5,7 +5,7 @@ adapter_contract: "EulerSwapAdapter"
 # Constructor signature of the Adapter contract"
 adapter_build_signature: "constructor(address,address)"
 # A comma separated list of args to be passed to the contructor of the Adapter contract"
-adapter_build_args: "0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8,0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE"
+adapter_build_args: "0xF75548aF02f1928CbE9015985D4Fcbf96d728544,0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f"
 # Whether or not the testing script should skip checking balances of the protocol components.
 # If set to `true` please always add a reason why it's skipped.
 skip_balance_check: false
@@ -15,8 +15,8 @@ skip_balance_check: false
 # Also please always add a reason why this account is needed for your tests.
 # This will be applied to each test.
 # initialized_accounts:
-#   - "0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8" # EulerSwapFactory, actually not needed for this test
-#   - "0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE" # EulerSwapPerihpery, actually not needed for this test
+#   - "0xF75548aF02f1928CbE9015985D4Fcbf96d728544" # EulerSwapFactory, actually not needed for this test
+#   - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, actually not needed for this test
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"
@@ -25,15 +25,15 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 21923450
-    stop_block: 21923470
+    start_block: 21986045
+    stop_block: 21986080
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
       - "0xa66957e58b60d6b92b850c8773a9ff9b0ba96a65" # This is the USDC vault in Euler lending protocol that will hold the USDC for the pool
       - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0x67C30405250e395f31d661274352dA404e624682"
+      - id: "0x2bFED8dBEb8e6226a15300AC77eE9130E52410fE"
         tokens:
           - "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
           - "0xdAC17F958D2ee523a2206206994597C13D831ec7"

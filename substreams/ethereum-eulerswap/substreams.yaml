@@ -22,7 +22,7 @@ network: mainnet
 modules:
   - name: map_protocol_components
     kind: map
-    initialBlock: 21923450
+    initialBlock: 21986045
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
@@ -30,7 +30,7 @@ modules:
 
   - name: store_protocol_components
     kind: store
-    initialBlock: 21923450
+    initialBlock: 21986045
     updatePolicy: set
     valueType: string
     inputs:
@@ -38,7 +38,7 @@ modules:
 
   - name: map_relative_component_balance
     kind: map
-    initialBlock: 21923450
+    initialBlock: 21986045
     inputs:
       - source: sf.ethereum.type.v2.Block
       - store: store_protocol_components
@@ -47,7 +47,7 @@ modules:
 
   - name: store_balances
     kind: store
-    initialBlock: 21923450
+    initialBlock: 21986045
     updatePolicy: add
     valueType: bigint
     inputs:
@@ -55,7 +55,7 @@ modules:
 
   - name: map_protocol_changes
     kind: map
-    initialBlock: 21923450
+    initialBlock: 21986045
     inputs:
       - source: sf.ethereum.type.v2.Block
       - map: map_protocol_components

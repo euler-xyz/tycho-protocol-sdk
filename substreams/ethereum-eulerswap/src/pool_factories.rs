@@ -24,7 +24,7 @@ pub fn maybe_create_component(
 ) -> Option<ProtocolComponent> {
     match *call.address {
         // EulerSwap Factory address
-        hex!("04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8") => {
+        hex!("F75548aF02f1928CbE9015985D4Fcbf96d728544") => {
             // Try to decode the DeployPool call (not used for now)
             let _deploy_call = crate::abi::eulerswap_factory::functions::DeployPool::match_and_decode(call)?;
             // Try to decode the PoolDeployed event
@@ -48,13 +48,23 @@ pub fn maybe_create_component(
                         change: ChangeType::Creation.into(),
                     },
                     tycho_substreams::models::Attribute {
-                        name: "swap_account".to_string(),
-                        value: pool_deployed.swap_account.clone(),
+                        name: "euler_account".to_string(),
+                        value: pool_deployed.euler_account.clone(),
                         change: ChangeType::Creation.into(),
                     },
                     tycho_substreams::models::Attribute {
                         name: "fee_multiplier".to_string(),
                         value: pool_deployed.fee_multiplier.to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    tycho_substreams::models::Attribute {
+                        name: "reserve0".to_string(),
+                        value: pool_deployed.reserve0.to_signed_bytes_be(),
+                        change: ChangeType::Creation.into(),
+                    },
+                    tycho_substreams::models::Attribute {
+                        name: "reserve1".to_string(),
+                        value: pool_deployed.reserve1.to_signed_bytes_be(),
                         change: ChangeType::Creation.into(),
                     },
                     tycho_substreams::models::Attribute {
