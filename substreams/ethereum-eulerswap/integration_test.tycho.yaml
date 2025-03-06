@@ -25,7 +25,7 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 21986045
+    start_block: 21986040
     stop_block: 21986080
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
@@ -33,14 +33,16 @@ tests:
       - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0x2bFED8dBEb8e6226a15300AC77eE9130E52410fE"
+      - id: "0x2bfed8dbeb8e6226a15300ac77ee9130e52410fe"
         tokens:
-          - "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-          - "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+          - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          - "0xdac17f958d2ee523a2206206994597c13d831ec7"
         static_attributes:
           pool_type: "0x45756c657253776170"
-          swap_account: "0x603765f9e9b8e3cbacbdf7a6e963b7ead77ae86f"
+          euler_account: "0x603765f9e9b8e3cbacbdf7a6e963b7ead77ae86f"
           fee_multiplier: "0x0de0b6b3a7640000"
+          reserve0: "0x77359400"
+          reserve1: "0x77359400"
           price_x: "0x0de0b6b3a7640000"
           price_y: "0x0de0b6b3a7640000"
           concentration_x: "0x0d7621dc58210000"

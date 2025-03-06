@@ -31,7 +31,7 @@ export SUBSTREAMS_API_TOKEN=eyJhbGci...
 
 # Build EulerSwap's Substreams wasm
 cd substreams
-cargo build --release --package ethereum-eulerswap --target wasm32-unknown-unknown
+cargo build --release --package "ethereum-eulerswap" --target wasm32-unknown-unknown
 cd ..
 
 # Run Postgres DB using Docker compose
