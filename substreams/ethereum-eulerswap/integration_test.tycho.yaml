@@ -16,8 +16,13 @@ skip_balance_check: true
 # This will be applied to each test.
 initialized_accounts:
   - "0x0c9a3dd6b8f28529d72d7f9ce918d493519ee383" # This is the EVC address
-#   - "0xF75548aF02f1928CbE9015985D4Fcbf96d728544" # EulerSwapFactory, actually not needed for this test
-  - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, used for quoting & getLimits()
+  # - "0xF75548aF02f1928CbE9015985D4Fcbf96d728544" # EulerSwapFactory, actually not needed for this test
+  - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, actually not needed for this test
+  - "0x29a56a1b8214d9cf7c5561811750d5cbdb45cc8e" # EVK: GenericFactory contract
+  - "0x8ff1c814719096b61abf00bb46ead0c9a529dd7d" # EVK: EVault implementation
+  - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
+  - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
+  - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"
@@ -34,7 +39,7 @@ tests:
       - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0x2bfed8dbeb8e6226a15300ac77ee9130e52410fe"
+      - id: "0x2bFED8dBEb8e6226a15300AC77eE9130E52410fE"
         tokens:
           - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
           - "0xdac17f958d2ee523a2206206994597c13d831ec7"

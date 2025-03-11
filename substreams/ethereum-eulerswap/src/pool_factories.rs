@@ -67,7 +67,7 @@ pub fn maybe_create_component(
             component = component.with_contracts(&[
                 pool_deployed.pool.clone(),     // The deployed pool contract
                 pool_deployed.vault0.clone(),   // Vault0 contract
-                pool_deployed.vault1.clone(),   // Vault1 contract
+                pool_deployed.vault1.clone()   // Vault1 contract
             ]);
             
             // Add attributes
