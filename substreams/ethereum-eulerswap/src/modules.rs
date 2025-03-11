@@ -27,10 +27,21 @@ use tycho_substreams::{
     prelude::*,
 };
 
+pub const EVC_ADDRESS: &[u8] = &hex!("0C9a3dd6b8F28529d72d7f9cE918D493519EE383");
+pub const EULERSWAP_PERIPHERY: &[u8] = &hex!("813d74e832b3d9e9451d8f0e871e877edf2a5a5f");
+pub const EVK_EVAULT_IMPL: &[u8] = &hex!("8ff1c814719096b61abf00bb46ead0c9a529dd7d");
+pub const EVK_VAULT_MODULE_IMPL: &[u8] = &hex!("b4ad4d9c02c01b01cf586c16f01c58c73c7f0188");
+pub const EVK_BORROWING_MODULE_IMPL: &[u8] = &hex!("639156f8feb0cd88205e4861a0224ec169605acf");
+pub const EVK_GOVERNANCE_MODULE_IMPL: &[u8] = &hex!("a61f5016f2cd5cec12d091f871fce1e1df5f0b67");
+pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb45cc8e");
+
 // Store key prefixes and suffixes for consistency
 const POOL_PREFIX: &str = "pool:";
 const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
+const VAULT_PREFIX: &str = "vault:";
+const VAULT0_SUFFIX: &str = ":vault0";
+const VAULT1_SUFFIX: &str = ":vault1";
 
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
@@ -43,6 +54,20 @@ fn pool_asset_key(pool_id: &str, is_asset0: bool) -> String {
         format!("{}{}{}", POOL_PREFIX, pool_id, ASSET0_SUFFIX)
     } else {
         format!("{}{}{}", POOL_PREFIX, pool_id, ASSET1_SUFFIX)
+    }
+}
+
+/// Format a store key for a vault address
+fn vault_key(vault_addr: &str) -> String {
+    format!("{}{}", VAULT_PREFIX, vault_addr)
+}
+
+/// Format a store key for a pool's vault
+fn pool_vault_key(pool_id: &str, is_vault0: bool) -> String {
+    if is_vault0 {
+        format!("{}{}{}", POOL_PREFIX, pool_id, VAULT0_SUFFIX)
+    } else {
+        format!("{}{}{}", POOL_PREFIX, pool_id, VAULT1_SUFFIX)
     }
 }
 
@@ -125,6 +150,39 @@ fn store_protocol_components(
                             0,
                             pool_asset_key(pool_id, false),
                             &store_address(&pc.tokens[1]),
+                        );
+                    }
+
+                    // Store vault addresses if available (index 1 and 2 in the contracts array)
+                    if pc.contracts.len() >= 3 {
+                        // Store vault0 (contract 1) with consistent formatting
+                        let vault0_addr = &store_address(&pc.contracts[1]);
+                        store.set(
+                            0,
+                            pool_vault_key(pool_id, true),
+                            vault0_addr,
+                        );
+                        
+                        // Also store using vault address as key for lookups
+                        store.set(
+                            0,
+                            vault_key(vault0_addr),
+                            pool_id,
+                        );
+                        
+                        // Store vault1 (contract 2) with consistent formatting
+                        let vault1_addr = &store_address(&pc.contracts[2]);
+                        store.set(
+                            0,
+                            pool_vault_key(pool_id, false),
+                            vault1_addr,
+                        );
+                        
+                        // Also store using vault address as key for lookups
+                        store.set(
+                            0,
+                            vault_key(vault1_addr),
+                            pool_id,
                         );
                     }
                 })
@@ -349,7 +407,18 @@ fn map_protocol_changes(
             // Check if this address belongs to a known pool using consistent formatting
             components_store
                 .get_last(pool_key(&format_pool_id(addr)))
-                .is_some()
+                .is_some() || 
+                // Check if this address is a vault for any component
+                components_store
+                    .get_last(vault_key(&format_pool_id(addr)))
+                    .is_some() ||
+                addr.eq(EVC_ADDRESS) ||
+                addr.eq(EULERSWAP_PERIPHERY) ||
+                addr.eq(EVK_EVAULT_IMPL) ||
+                addr.eq(EVK_VAULT_MODULE_IMPL) ||
+                addr.eq(EVK_BORROWING_MODULE_IMPL) ||
+                addr.eq(EVK_GOVERNANCE_MODULE_IMPL) ||
+                addr.eq(EVK_GENERIC_FACTORY)
         },
         &mut transaction_changes,
     );
