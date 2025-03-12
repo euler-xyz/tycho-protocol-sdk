@@ -86,10 +86,10 @@ pub fn maybe_create_component(
                 ("concentrations", &json_serialize_bigint_list(&concentrations)),
                 // Add stateless contract address
                 ("stateless_contract_addr_0", &EVK_EVAULT_IMPL),
-                // ("stateless_contract_addr_1", format!("0x{}", hex::encode(&EVK_VAULT_MODULE_IMPL)).as_bytes()),
-                // ("stateless_contract_addr_2", format!("0x{}", hex::encode(&EVK_BORROWING_MODULE_IMPL)).as_bytes()),
-                // ("stateless_contract_addr_3", format!("0x{}", hex::encode(&EVK_GOVERNANCE_MODULE_IMPL)).as_bytes()),
-                // ("stateless_contract_addr_4", format!("0x{}", hex::encode(&EVK_GENERIC_FACTORY)).as_bytes()),
+                ("stateless_contract_addr_1", &EVK_VAULT_MODULE_IMPL),
+                ("stateless_contract_addr_2", &EVK_BORROWING_MODULE_IMPL),
+                ("stateless_contract_addr_3", &EVK_GOVERNANCE_MODULE_IMPL),
+                ("stateless_contract_addr_4", &EVK_GENERIC_FACTORY),
                 ("manual_updates", &[1u8]),
             ]);
             
