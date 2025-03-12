@@ -25,6 +25,7 @@ use tycho_substreams::{
     balances::aggregate_balances_changes, 
     contract::extract_contract_changes_builder,
     prelude::*,
+    abi::erc20,
 };
 
 pub const EVC_ADDRESS: &[u8] = &hex!("0C9a3dd6b8F28529d72d7f9cE918D493519EE383");
@@ -441,36 +442,87 @@ fn map_protocol_changes(
         &mut transaction_changes,
     );
 
-    // Extract token balances for EulerSwap vaults
+    // Track ERC20 Transfer events for vault balances
+    // Process all Transfer events in the block related to vaults
     block
-        .transaction_traces
-        .iter()
-        .for_each(|tx| {
-            // Process vault contract changes by tracking token balances
-            tx.calls
-                .iter()
-                .filter(|call| !call.state_reverted)
-                .for_each(|call| {
-                    let call_address_str = store_address(&call.address);
+        .logs()
+        .for_each(|log| {
+            // Look for Transfer events from ERC20 tokens
+            if let Some(transfer) = erc20::events::Transfer::match_and_decode(log.log) {
+                let from_str = store_address(&transfer.from);
+                let to_str = store_address(&transfer.to);
+                let token_address = log.address().to_vec();
+                
+                // Check if sender is a known vault
+                if components_store.get_last(vault_key(&from_str)).is_some() {
+                    // This is a transfer out of a vault
+                    let vault_address = decode_address(&from_str);
+                    let mut vault_change = InterimContractChange::new(&vault_address, true);
                     
-                    // Check if this call is to a known vault
-                    if components_store.get_last(vault_key(&call_address_str)).is_some() {
-                        // Since we identified this as a vault, we need to track token balance changes
-                        // but without being able to query which pools contain this vault
-                        
-                        // Create a contract change for this vault and mark it as having changed
-                        let contract_change = InterimContractChange::new(&call.address, true);
-                        
-                        // Add the contract change to the builder directly
-                        let tycho_tx = Transaction::from(tx);
-                        let builder = transaction_changes
-                            .entry(tx.index.into())
-                            .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
-                        
-                        // Add the contract changes to the builder
-                        builder.add_contract_changes(&contract_change);
-                    }
-                });
+                    // Add token balance delta (negative since tokens are leaving)
+                    vault_change.upsert_token_balance(
+                        &token_address, 
+                        &transfer.value.neg().to_signed_bytes_be()
+                    );
+                    
+                    // Add the contract change to the builder
+                    let tycho_tx: Transaction = Transaction::from(log.receipt.transaction);
+                    let builder = transaction_changes
+                        .entry(tycho_tx.index.into())
+                        .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+    
+                    // // Create Transaction from the log receipt transaction data
+                    // let tx_index = log.receipt.transaction.index.into();
+                    // let tx_hash = log.receipt.transaction.hash.clone();
+                    // let tycho_tx = Transaction {
+                    //     hash: tx_hash,
+                    //     index: tx_index,
+                    //     // Other fields will be default values
+                    //     ..Default::default()
+                    // };
+                    
+                    // let builder = transaction_changes
+                    //     .entry(tx_index)
+                    //     .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+                    
+                    builder.add_contract_changes(&vault_change);
+                }
+                
+                // Check if receiver is a known vault
+                if components_store.get_last(vault_key(&to_str)).is_some() {
+                    // This is a transfer into a vault
+                    let vault_address = decode_address(&to_str);
+                    let mut vault_change = InterimContractChange::new(&vault_address, true);
+                    
+                    // Add token balance delta (positive since tokens are entering)
+                    vault_change.upsert_token_balance(
+                        &token_address,
+                        &transfer.value.to_signed_bytes_be()
+                    );
+                    
+                    let tycho_tx: Transaction = Transaction::from(log.receipt.transaction);
+                    let builder = transaction_changes
+                        .entry(tycho_tx.index.into())
+                        .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+
+                    // // Add the contract change to the builder
+                    // // Create Transaction from the log receipt transaction data 
+                    // let tx_index = log.receipt.transaction.index.into();
+                    // let tx_hash = log.receipt.transaction.hash.clone();
+                    // let tycho_tx = Transaction {
+                    //     hash: tx_hash,
+                    //     index: tx_index,
+                    //     // Other fields will be default values
+                    //     ..Default::default()
+                    // };
+                    
+                    // let builder = transaction_changes
+                    //     .entry(tx_index)
+                    //     .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+                    
+                    builder.add_contract_changes(&vault_change);
+                }
+            }
         });
 
     // Update components that had contract changes
@@ -485,11 +537,14 @@ fn map_protocol_changes(
                 
             addresses
                 .into_iter()
-                .for_each(|address| {
-                    // We reconstruct the component_id from the address here
-                    let pool_id = format_pool_id(&address);
-                    if let Some(component_id) = components_store.get_last(pool_key(&pool_id)) {
-                        change.mark_component_as_updated(&component_id);
+                .for_each(|address: Vec<u8>| {
+                    let address_str = store_address(&address);
+                    if !components_store.get_last(vault_key(&address_str)).is_some() {
+                        // We reconstruct the component_id from the address here
+                        let pool_id = format_pool_id(&address);
+                        if let Some(component_id) = components_store.get_last(pool_key(&pool_id)) {
+                            change.mark_component_as_updated(&component_id);
+                        }
                     }
                 });
         });
