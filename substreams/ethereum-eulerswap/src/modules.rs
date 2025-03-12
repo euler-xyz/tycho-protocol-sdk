@@ -423,9 +423,9 @@ fn map_protocol_changes(
             //     .is_some();
                 
             // Check if address is any known vault
-            // let is_vault: bool = components_store
-            //     .get_last(vault_key(&addr_str))
-            //     .is_some();
+            let is_vault = components_store
+                .get_last(vault_key(&addr_str))
+                .is_some();
                 
             // Check if this address is one of the known fixed addresses
             let is_known_fixed_address = addr.eq(EVC_ADDRESS) ||
@@ -436,11 +436,42 @@ fn map_protocol_changes(
                 addr.eq(EVK_GOVERNANCE_MODULE_IMPL) ||
                 addr.eq(EVK_GENERIC_FACTORY);
             
-            // is_pool || is_token || is_vault || is_known_fixed_address
-            is_pool || is_known_fixed_address
+            is_pool || is_vault || is_known_fixed_address
         },
         &mut transaction_changes,
     );
+
+    // Extract token balances for EulerSwap vaults
+    block
+        .transaction_traces
+        .iter()
+        .for_each(|tx| {
+            // Process vault contract changes by tracking token balances
+            tx.calls
+                .iter()
+                .filter(|call| !call.state_reverted)
+                .for_each(|call| {
+                    let call_address_str = store_address(&call.address);
+                    
+                    // Check if this call is to a known vault
+                    if components_store.get_last(vault_key(&call_address_str)).is_some() {
+                        // Since we identified this as a vault, we need to track token balance changes
+                        // but without being able to query which pools contain this vault
+                        
+                        // Create a contract change for this vault and mark it as having changed
+                        let contract_change = InterimContractChange::new(&call.address, true);
+                        
+                        // Add the contract change to the builder directly
+                        let tycho_tx = Transaction::from(tx);
+                        let builder = transaction_changes
+                            .entry(tx.index.into())
+                            .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+                        
+                        // Add the contract changes to the builder
+                        builder.add_contract_changes(&contract_change);
+                    }
+                });
+        });
 
     // Update components that had contract changes
     transaction_changes
