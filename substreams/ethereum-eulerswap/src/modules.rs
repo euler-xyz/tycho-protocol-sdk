@@ -343,56 +343,52 @@ fn map_protocol_changes(
     // making it easy to sort them at the very end.
     let mut transaction_changes: HashMap<_, TransactionChangesBuilder> = HashMap::new();
 
+    // Default attributes to add to all pool components
+    let default_attributes = vec![
+        Attribute {
+            name: "balance_owner".to_string(),
+            // Use the pool address as the balance owner
+            value: vec![], // We'll fill this in for each component
+            change: ChangeType::Creation.into(),
+        },
+        Attribute {
+            name: "update_marker".to_string(),
+            value: vec![1u8],
+            change: ChangeType::Creation.into(),
+        },
+    ];
+
     // Aggregate newly created components per tx
     new_components
-        .tx_components
-        .iter()
-        .for_each(|tx_component| {
-            // Initialize builder if not yet present for this tx
-            let tx = tx_component.tx.as_ref().unwrap();
-            let builder = transaction_changes
-                .entry(tx.index)
-                .or_insert_with(|| TransactionChangesBuilder::new(tx));
+    .tx_components
+    .iter()
+    .for_each(|tx_component| {
+        // Initialize builder if not yet present for this tx
+        let tx = tx_component.tx.as_ref().unwrap();
+        let builder = transaction_changes
+            .entry(tx.index)
+            .or_insert_with(|| TransactionChangesBuilder::new(tx));
 
-            // Iterate over individual components created within this tx
-            tx_component
-                .components
-                .iter()
-                .for_each(|component| {
-                    // Add the component to the builder
-                    builder.add_protocol_component(component);
-                    
-                    // Create attributes for each component
-                    let mut component_attributes = Vec::new();
-                    
-                    // Add update marker attribute
-                    component_attributes.push(Attribute {
-                        name: "update_marker".to_string(),
-                        value: vec![1u8],
-                        change: ChangeType::Creation.into(),
-                    });
-                    
-                    // Add vault0 as a balance owner
-                    component_attributes.push(Attribute {
-                        name: "balance_owner".to_string(),
-                        value: component.contracts[1].clone(), // vault0
-                        change: ChangeType::Creation.into(),
-                    });
-                    
-                    // Add vault1 as a balance owner
-                    component_attributes.push(Attribute {
-                        name: "balance_owner".to_string(),
-                        value: component.contracts[2].clone(), // vault1
-                        change: ChangeType::Creation.into(),
-                    });
-                    
-                    // Add entity changes with the attributes
-                    builder.add_entity_change(&EntityChanges {
-                        component_id: component.id.clone(),
-                        attributes: component_attributes,
-                    });
+        // Iterate over individual components created within this tx
+        tx_component
+            .components
+            .iter()
+            .for_each(|component| {
+                // Add the component to the builder
+                builder.add_protocol_component(component);
+                
+                // Create attributes with the correct balance owner
+                let mut component_attributes = default_attributes.clone();
+                // Set the balance owner to the pool address
+                component_attributes[0].value = decode_address(&component.id);
+                
+                // Add entity changes with the attributes
+                builder.add_entity_change(&EntityChanges {
+                    component_id: component.id.clone(),
+                    attributes: component_attributes,
                 });
-        });
+            });
+    });
 
     // Aggregate absolute balances per transaction.
     aggregate_balances_changes(balance_store, deltas)
