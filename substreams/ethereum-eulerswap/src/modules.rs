@@ -362,44 +362,34 @@ fn map_protocol_changes(
                     // Add the component to the builder
                     builder.add_protocol_component(component);
                     
-                    // Create attributes for the component
-                    let mut attributes = Vec::new();
+                    // Create attributes for each component
+                    let mut component_attributes = Vec::new();
                     
                     // Add update marker attribute
-                    attributes.push(Attribute {
+                    component_attributes.push(Attribute {
                         name: "update_marker".to_string(),
                         value: vec![1u8],
                         change: ChangeType::Creation.into(),
                     });
                     
-                    // Check if the component has vault addresses (should be at indices 1 and 2 in contracts array)
-                    if component.contracts.len() >= 3 {
-                        // Add vault0 as a balance owner
-                        attributes.push(Attribute {
-                            name: "balance_owner".to_string(),
-                            value: component.contracts[1].clone(), // vault0
-                            change: ChangeType::Creation.into(),
-                        });
-                        
-                        // Add vault1 as a balance owner
-                        attributes.push(Attribute {
-                            name: "balance_owner".to_string(),
-                            value: component.contracts[2].clone(), // vault1
-                            change: ChangeType::Creation.into(),
-                        });
-                    } else {
-                        // Fallback to pool address as balance owner if vaults aren't available
-                        attributes.push(Attribute {
-                            name: "balance_owner".to_string(),
-                            value: decode_address(&component.id),
-                            change: ChangeType::Creation.into(),
-                        });
-                    }
+                    // Add vault0 as a balance owner
+                    component_attributes.push(Attribute {
+                        name: "balance_owner".to_string(),
+                        value: component.contracts[1].clone(), // vault0
+                        change: ChangeType::Creation.into(),
+                    });
+                    
+                    // Add vault1 as a balance owner
+                    component_attributes.push(Attribute {
+                        name: "balance_owner".to_string(),
+                        value: component.contracts[2].clone(), // vault1
+                        change: ChangeType::Creation.into(),
+                    });
                     
                     // Add entity changes with the attributes
                     builder.add_entity_change(&EntityChanges {
                         component_id: component.id.clone(),
-                        attributes,
+                        attributes: component_attributes,
                     });
                 });
         });
