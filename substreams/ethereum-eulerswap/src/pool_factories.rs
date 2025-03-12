@@ -73,14 +73,7 @@ pub fn maybe_create_component(
                 pool_deployed.pool.clone(),     // The deployed pool contract
                 pool_deployed.vault0.clone(),   // Vault0 contract
                 pool_deployed.vault1.clone(),   // Vault1 contract
-                // pool_deployed.asset0.clone(),  // First token
-                // pool_deployed.asset1.clone(),  // Second token
-                EVC_ADDRESS.to_vec(),           // EVC address
-                EVK_EVAULT_IMPL.to_vec(),       // eVault implementation
-                EVK_VAULT_MODULE_IMPL.to_vec(), // Vault module implementation
-                EVK_BORROWING_MODULE_IMPL.to_vec(), // Borrowing module implementation
-                EVK_GOVERNANCE_MODULE_IMPL.to_vec(), // Governance module implementation
-                EVK_GENERIC_FACTORY.to_vec()    // Generic factory
+                EVC_ADDRESS.to_vec()            // EVC address
             ]);
             
             // Add attributes
@@ -91,7 +84,12 @@ pub fn maybe_create_component(
                 ("reserves", &json_serialize_bigint_list(&reserves)),
                 ("prices", &json_serialize_bigint_list(&prices)),
                 ("concentrations", &json_serialize_bigint_list(&concentrations)),
-                // Add update marker for consistency with other protocols
+                // Add stateless contract address
+                ("stateless_contract_addr_0", &EVK_EVAULT_IMPL),
+                // ("stateless_contract_addr_1", format!("0x{}", hex::encode(&EVK_VAULT_MODULE_IMPL)).as_bytes()),
+                // ("stateless_contract_addr_2", format!("0x{}", hex::encode(&EVK_BORROWING_MODULE_IMPL)).as_bytes()),
+                // ("stateless_contract_addr_3", format!("0x{}", hex::encode(&EVK_GOVERNANCE_MODULE_IMPL)).as_bytes()),
+                // ("stateless_contract_addr_4", format!("0x{}", hex::encode(&EVK_GENERIC_FACTORY)).as_bytes()),
                 ("manual_updates", &[1u8]),
             ]);
             
