@@ -39,9 +39,12 @@ pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb
 const POOL_PREFIX: &str = "pool:";
 const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
-const VAULT_PREFIX: &str = "vault:";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
+
+// Add keys for tracking all tokens and vaults
+const ALL_TOKENS_KEY: &str = "all_tokens";
+const ALL_VAULTS_KEY: &str = "all_vaults";
 
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
@@ -55,11 +58,6 @@ fn pool_asset_key(pool_id: &str, is_asset0: bool) -> String {
     } else {
         format!("{}{}{}", POOL_PREFIX, pool_id, ASSET1_SUFFIX)
     }
-}
-
-/// Format a store key for a vault address
-fn vault_key(vault_addr: &str) -> String {
-    format!("{}{}", VAULT_PREFIX, vault_addr)
 }
 
 /// Format a store key for a pool's vault
@@ -122,6 +120,10 @@ fn store_protocol_components(
     map_protocol_components: BlockTransactionProtocolComponents,
     store: StoreSetString,
 ) {
+    // Create sets to track unique tokens and vaults
+    let mut all_tokens = std::collections::HashSet::new();
+    let mut all_vaults = std::collections::HashSet::new();
+
     map_protocol_components
         .tx_components
         .into_iter()
@@ -139,18 +141,26 @@ fn store_protocol_components(
                     // Store token addresses if available (index 0 and 1 in the tokens array)
                     if pc.tokens.len() >= 2 {
                         // Store asset0 (token 0) with consistent formatting
+                        let token0_addr = &store_address(&pc.tokens[0]);
                         store.set(
                             0,
                             pool_asset_key(pool_id, true),
-                            &store_address(&pc.tokens[0]),
+                            token0_addr,
                         );
                         
+                        // Add to all tokens set
+                        all_tokens.insert(token0_addr.clone());
+                        
                         // Store asset1 (token 1) with consistent formatting
+                        let token1_addr = &store_address(&pc.tokens[1]);
                         store.set(
                             0,
                             pool_asset_key(pool_id, false),
-                            &store_address(&pc.tokens[1]),
+                            token1_addr,
                         );
+                        
+                        // Add to all tokens set
+                        all_tokens.insert(token1_addr.clone());
                     }
 
                     // Store vault addresses if available (index 1 and 2 in the contracts array)
@@ -163,12 +173,8 @@ fn store_protocol_components(
                             vault0_addr,
                         );
                         
-                        // Also store using vault address as key for lookups
-                        store.set(
-                            0,
-                            vault_key(vault0_addr),
-                            pool_id,
-                        );
+                        // Add to all vaults set
+                        all_vaults.insert(vault0_addr.clone());
                         
                         // Store vault1 (contract 2) with consistent formatting
                         let vault1_addr = &store_address(&pc.contracts[2]);
@@ -178,15 +184,23 @@ fn store_protocol_components(
                             vault1_addr,
                         );
                         
-                        // Also store using vault address as key for lookups
-                        store.set(
-                            0,
-                            vault_key(vault1_addr),
-                            pool_id,
-                        );
+                        // Add to all vaults set
+                        all_vaults.insert(vault1_addr.clone());
                     }
                 })
         });
+    
+    // Store all collected token addresses using the address itself as the key to avoid duplication
+    for token in all_tokens.iter() {
+        // Use the token address as the key and store itself as value for simpler lookups
+        store.set(0, format!("{}:{}", ALL_TOKENS_KEY, token), token);
+    }
+    
+    // Store all collected vault addresses using the address itself as the key to avoid duplication
+    for vault in all_vaults.iter() {
+        // Use the vault address as the key and store itself as value for simpler lookups
+        store.set(0, format!("{}:{}", ALL_VAULTS_KEY, vault), vault);
+    }
 }
 
 /// Maps token balance deltas for each EulerSwap pool component in a block
@@ -404,21 +418,33 @@ fn map_protocol_changes(
     extract_contract_changes_builder(
         &block,
         |addr| {
+            let addr_str = store_address(addr);
+            
             // Check if this address belongs to a known pool using consistent formatting
-            components_store
-                .get_last(pool_key(&format_pool_id(addr)))
-                .is_some() || 
-                // Check if this address is a vault for any component
-                components_store
-                    .get_last(vault_key(&store_address(addr)))
-                    .is_some() ||
-                addr.eq(EVC_ADDRESS) ||
+            let is_pool = components_store
+                .get_last(pool_key(&addr_str))
+                .is_some();
+            
+            // Check if address is any known token - directly via the token-based key
+            let is_token = components_store
+                .get_last(format!("{}:{}", ALL_TOKENS_KEY, addr_str))
+                .is_some();
+                
+            // Check if address is any known vault - directly via the vault-based key
+            let is_vault = components_store
+                .get_last(format!("{}:{}", ALL_VAULTS_KEY, addr_str))
+                .is_some();
+                
+            // Check if this address is one of the known fixed addresses
+            let is_known_fixed_address = addr.eq(EVC_ADDRESS) ||
                 addr.eq(EULERSWAP_PERIPHERY) ||
                 addr.eq(EVK_EVAULT_IMPL) ||
                 addr.eq(EVK_VAULT_MODULE_IMPL) ||
                 addr.eq(EVK_BORROWING_MODULE_IMPL) ||
                 addr.eq(EVK_GOVERNANCE_MODULE_IMPL) ||
-                addr.eq(EVK_GENERIC_FACTORY)
+                addr.eq(EVK_GENERIC_FACTORY);
+            
+            is_pool || is_token || is_vault || is_known_fixed_address
         },
         &mut transaction_changes,
     );
