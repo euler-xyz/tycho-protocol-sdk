@@ -41,10 +41,8 @@ const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
-
-// Add keys for tracking all tokens and vaults
-const ALL_TOKENS_KEY: &str = "all_tokens";
-const ALL_VAULTS_KEY: &str = "all_vaults";
+const TOKEN_PREFIX: &str = "token:";
+const VAULT_PREFIX: &str = "vault:";
 
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
@@ -67,6 +65,16 @@ fn pool_vault_key(pool_id: &str, is_vault0: bool) -> String {
     } else {
         format!("{}{}{}", POOL_PREFIX, pool_id, VAULT1_SUFFIX)
     }
+}
+
+/// Format a store key for a token lookup
+fn token_key(token_addr: &str) -> String {
+    format!("{}{}", TOKEN_PREFIX, token_addr)
+}
+
+/// Format a store key for a vault lookup
+fn vault_key(vault_addr: &str) -> String {
+    format!("{}{}", VAULT_PREFIX, vault_addr)
 }
 
 /// Store an address in a consistent format
@@ -120,10 +128,6 @@ fn store_protocol_components(
     map_protocol_components: BlockTransactionProtocolComponents,
     store: StoreSetString,
 ) {
-    // Create sets to track unique tokens and vaults
-    let mut all_tokens = std::collections::HashSet::new();
-    let mut all_vaults = std::collections::HashSet::new();
-
     map_protocol_components
         .tx_components
         .into_iter()
@@ -139,29 +143,29 @@ fn store_protocol_components(
                     store.set(0, pool_key(pool_id), pool_id);
                     
                     // Store token addresses if available (index 0 and 1 in the tokens array)
-                    if pc.tokens.len() >= 2 {
-                        // Store asset0 (token 0) with consistent formatting
-                        let token0_addr = &store_address(&pc.tokens[0]);
-                        store.set(
-                            0,
-                            pool_asset_key(pool_id, true),
-                            token0_addr,
-                        );
+                    // if pc.tokens.len() >= 2 {
+                    //     // Store asset0 (token 0) with consistent formatting
+                    //     let token0_addr = &store_address(&pc.tokens[0]);
+                    //     store.set(
+                    //         0,
+                    //         pool_asset_key(pool_id, true),
+                    //         token0_addr,
+                    //     );
                         
-                        // Add to all tokens set
-                        all_tokens.insert(token0_addr.clone());
+                    //     // Add reverse index for token lookup
+                    //     store.set(0, token_key(token0_addr), token0_addr);
                         
-                        // Store asset1 (token 1) with consistent formatting
-                        let token1_addr = &store_address(&pc.tokens[1]);
-                        store.set(
-                            0,
-                            pool_asset_key(pool_id, false),
-                            token1_addr,
-                        );
+                    //     // Store asset1 (token 1) with consistent formatting
+                    //     let token1_addr = &store_address(&pc.tokens[1]);
+                    //     store.set(
+                    //         0,
+                    //         pool_asset_key(pool_id, false),
+                    //         token1_addr,
+                    //     );
                         
-                        // Add to all tokens set
-                        all_tokens.insert(token1_addr.clone());
-                    }
+                    //     // Add reverse index for token lookup
+                    //     store.set(0, token_key(token1_addr), token1_addr);
+                    // }
 
                     // Store vault addresses if available (index 1 and 2 in the contracts array)
                     if pc.contracts.len() >= 3 {
@@ -173,8 +177,8 @@ fn store_protocol_components(
                             vault0_addr,
                         );
                         
-                        // Add to all vaults set
-                        all_vaults.insert(vault0_addr.clone());
+                        // Add reverse index for vault lookup
+                        store.set(0, vault_key(vault0_addr), vault0_addr);
                         
                         // Store vault1 (contract 2) with consistent formatting
                         let vault1_addr = &store_address(&pc.contracts[2]);
@@ -184,23 +188,11 @@ fn store_protocol_components(
                             vault1_addr,
                         );
                         
-                        // Add to all vaults set
-                        all_vaults.insert(vault1_addr.clone());
+                        // Add reverse index for vault lookup
+                        store.set(0, vault_key(vault1_addr), vault1_addr);
                     }
                 })
         });
-    
-    // Store all collected token addresses using the address itself as the key to avoid duplication
-    for token in all_tokens.iter() {
-        // Use the token address as the key and store itself as value for simpler lookups
-        store.set(0, format!("{}:{}", ALL_TOKENS_KEY, token), token);
-    }
-    
-    // Store all collected vault addresses using the address itself as the key to avoid duplication
-    for vault in all_vaults.iter() {
-        // Use the vault address as the key and store itself as value for simpler lookups
-        store.set(0, format!("{}:{}", ALL_VAULTS_KEY, vault), vault);
-    }
 }
 
 /// Maps token balance deltas for each EulerSwap pool component in a block
@@ -425,15 +417,15 @@ fn map_protocol_changes(
                 .get_last(pool_key(&addr_str))
                 .is_some();
             
-            // Check if address is any known token - directly via the token-based key
-            let is_token = components_store
-                .get_last(format!("{}:{}", ALL_TOKENS_KEY, addr_str))
-                .is_some();
+            // Check if address is any known token
+            // let is_token: bool = components_store
+            //     .get_last(token_key(&addr_str))
+            //     .is_some();
                 
-            // Check if address is any known vault - directly via the vault-based key
-            let is_vault = components_store
-                .get_last(format!("{}:{}", ALL_VAULTS_KEY, addr_str))
-                .is_some();
+            // Check if address is any known vault
+            // let is_vault: bool = components_store
+            //     .get_last(vault_key(&addr_str))
+            //     .is_some();
                 
             // Check if this address is one of the known fixed addresses
             let is_known_fixed_address = addr.eq(EVC_ADDRESS) ||
@@ -444,7 +436,8 @@ fn map_protocol_changes(
                 addr.eq(EVK_GOVERNANCE_MODULE_IMPL) ||
                 addr.eq(EVK_GENERIC_FACTORY);
             
-            is_pool || is_token || is_vault || is_known_fixed_address
+            // is_pool || is_token || is_vault || is_known_fixed_address
+            is_pool || is_known_fixed_address
         },
         &mut transaction_changes,
     );

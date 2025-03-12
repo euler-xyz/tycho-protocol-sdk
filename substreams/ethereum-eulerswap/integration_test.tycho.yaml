@@ -22,8 +22,8 @@ initialized_accounts:
   - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
   - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
   - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
-  # - "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" # This is the USDC address
-  # - "0xdac17f958d2ee523a2206206994597c13d831ec7" # This is the USDT token
+  # - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" # USDC
+  # - "0xdac17f958d2ee523a2206206994597c13d831ec7" # USDT
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"

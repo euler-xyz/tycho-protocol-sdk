@@ -73,6 +73,8 @@ pub fn maybe_create_component(
                 pool_deployed.pool.clone(),     // The deployed pool contract
                 pool_deployed.vault0.clone(),   // Vault0 contract
                 pool_deployed.vault1.clone(),   // Vault1 contract
+                // pool_deployed.asset0.clone(),  // First token
+                // pool_deployed.asset1.clone(),  // Second token
                 EVC_ADDRESS.to_vec(),           // EVC address
                 EVK_EVAULT_IMPL.to_vec(),       // eVault implementation
                 EVK_VAULT_MODULE_IMPL.to_vec(), // Vault module implementation
