@@ -144,29 +144,29 @@ fn store_protocol_components(
                     store.set(0, pool_key(pool_id), pool_id);
                     
                     // Store token addresses if available (index 0 and 1 in the tokens array)
-                    // if pc.tokens.len() >= 2 {
-                    //     // Store asset0 (token 0) with consistent formatting
-                    //     let token0_addr = &store_address(&pc.tokens[0]);
-                    //     store.set(
-                    //         0,
-                    //         pool_asset_key(pool_id, true),
-                    //         token0_addr,
-                    //     );
+                    if pc.tokens.len() >= 2 {
+                        // Store asset0 (token 0) with consistent formatting
+                        let token0_addr = &store_address(&pc.tokens[0]);
+                        store.set(
+                            0,
+                            pool_asset_key(pool_id, true),
+                            token0_addr,
+                        );
                         
-                    //     // Add reverse index for token lookup
-                    //     store.set(0, token_key(token0_addr), token0_addr);
+                        // Add reverse index for token lookup
+                        store.set(0, token_key(token0_addr), token0_addr);
                         
-                    //     // Store asset1 (token 1) with consistent formatting
-                    //     let token1_addr = &store_address(&pc.tokens[1]);
-                    //     store.set(
-                    //         0,
-                    //         pool_asset_key(pool_id, false),
-                    //         token1_addr,
-                    //     );
+                        // Store asset1 (token 1) with consistent formatting
+                        let token1_addr = &store_address(&pc.tokens[1]);
+                        store.set(
+                            0,
+                            pool_asset_key(pool_id, false),
+                            token1_addr,
+                        );
                         
-                    //     // Add reverse index for token lookup
-                    //     store.set(0, token_key(token1_addr), token1_addr);
-                    // }
+                        // Add reverse index for token lookup
+                        store.set(0, token_key(token1_addr), token1_addr);
+                    }
 
                     // Store vault addresses if available (index 1 and 2 in the contracts array)
                     if pc.contracts.len() >= 3 {
@@ -470,21 +470,7 @@ fn map_protocol_changes(
                     let builder = transaction_changes
                         .entry(tycho_tx.index.into())
                         .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
-    
-                    // // Create Transaction from the log receipt transaction data
-                    // let tx_index = log.receipt.transaction.index.into();
-                    // let tx_hash = log.receipt.transaction.hash.clone();
-                    // let tycho_tx = Transaction {
-                    //     hash: tx_hash,
-                    //     index: tx_index,
-                    //     // Other fields will be default values
-                    //     ..Default::default()
-                    // };
-                    
-                    // let builder = transaction_changes
-                    //     .entry(tx_index)
-                    //     .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
-                    
+                        
                     builder.add_contract_changes(&vault_change);
                 }
                 
@@ -505,21 +491,6 @@ fn map_protocol_changes(
                         .entry(tycho_tx.index.into())
                         .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
 
-                    // // Add the contract change to the builder
-                    // // Create Transaction from the log receipt transaction data 
-                    // let tx_index = log.receipt.transaction.index.into();
-                    // let tx_hash = log.receipt.transaction.hash.clone();
-                    // let tycho_tx = Transaction {
-                    //     hash: tx_hash,
-                    //     index: tx_index,
-                    //     // Other fields will be default values
-                    //     ..Default::default()
-                    // };
-                    
-                    // let builder = transaction_changes
-                    //     .entry(tx_index)
-                    //     .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
-                    
                     builder.add_contract_changes(&vault_change);
                 }
             }
