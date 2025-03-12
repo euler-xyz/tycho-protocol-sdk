@@ -142,55 +142,51 @@ fn store_protocol_components(
                     // Store using consistent format "pool:{ID}" -> full pool ID
                     store.set(0, pool_key(pool_id), pool_id);
                     
-                    // Store token addresses if available (index 0 and 1 in the tokens array)
-                    // if pc.tokens.len() >= 2 {
-                    //     // Store asset0 (token 0) with consistent formatting
-                    //     let token0_addr = &store_address(&pc.tokens[0]);
-                    //     store.set(
-                    //         0,
-                    //         pool_asset_key(pool_id, true),
-                    //         token0_addr,
-                    //     );
-                        
-                    //     // Add reverse index for token lookup
-                    //     store.set(0, token_key(token0_addr), token0_addr);
-                        
-                    //     // Store asset1 (token 1) with consistent formatting
-                    //     let token1_addr = &store_address(&pc.tokens[1]);
-                    //     store.set(
-                    //         0,
-                    //         pool_asset_key(pool_id, false),
-                    //         token1_addr,
-                    //     );
-                        
-                    //     // Add reverse index for token lookup
-                    //     store.set(0, token_key(token1_addr), token1_addr);
-                    // }
+                    // Store tokens
+                    // Store asset0 (token 0) with consistent formatting
+                    let token0_addr = &store_address(&pc.tokens[0]);
+                    store.set(
+                        0,
+                        pool_asset_key(pool_id, true),
+                        token0_addr,
+                    );
+                    
+                    // Add reverse index for token lookup
+                    store.set(0, token_key(token0_addr), token0_addr);
+                    
+                    // Store asset1 (token 1) with consistent formatting
+                    let token1_addr = &store_address(&pc.tokens[1]);
+                    store.set(
+                        0,
+                        pool_asset_key(pool_id, false),
+                        token1_addr,
+                    );
+                    
+                    // Add reverse index for token lookup
+                    store.set(0, token_key(token1_addr), token1_addr);
 
-                    // Store vault addresses if available (index 1 and 2 in the contracts array)
-                    if pc.contracts.len() >= 3 {
-                        // Store vault0 (contract 1) with consistent formatting
-                        let vault0_addr = &store_address(&pc.contracts[1]);
-                        store.set(
-                            0,
-                            pool_vault_key(pool_id, true),
-                            vault0_addr,
-                        );
-                        
-                        // Add reverse index for vault lookup
-                        store.set(0, vault_key(vault0_addr), vault0_addr);
-                        
-                        // Store vault1 (contract 2) with consistent formatting
-                        let vault1_addr = &store_address(&pc.contracts[2]);
-                        store.set(
-                            0,
-                            pool_vault_key(pool_id, false),
-                            vault1_addr,
-                        );
-                        
-                        // Add reverse index for vault lookup
-                        store.set(0, vault_key(vault1_addr), vault1_addr);
-                    }
+                    // Store vaults
+                    // Store vault0 (contract 1) with consistent formatting
+                    let vault0_addr = &store_address(&pc.contracts[1]);
+                    store.set(
+                        0,
+                        pool_vault_key(pool_id, true),
+                        vault0_addr,
+                    );
+                    
+                    // Add reverse index for vault lookup
+                    store.set(0, vault_key(vault0_addr), vault0_addr);
+                    
+                    // Store vault1 (contract 2) with consistent formatting
+                    let vault1_addr = &store_address(&pc.contracts[2]);
+                    store.set(
+                        0,
+                        pool_vault_key(pool_id, false),
+                        vault1_addr,
+                    );
+                    
+                    // Add reverse index for vault lookup
+                    store.set(0, vault_key(vault1_addr), vault1_addr);
                 })
         });
 }
