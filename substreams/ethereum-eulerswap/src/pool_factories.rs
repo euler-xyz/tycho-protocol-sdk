@@ -5,6 +5,11 @@ use tycho_substreams::{
     models::{ImplementationType, ProtocolComponent},
 };
 use substreams_ethereum::{Event, Function};
+use crate::modules::{
+    EVC_ADDRESS, EVK_EVAULT_IMPL, 
+    EVK_VAULT_MODULE_IMPL, EVK_BORROWING_MODULE_IMPL,
+    EVK_GOVERNANCE_MODULE_IMPL, EVK_GENERIC_FACTORY
+};
 
 /// Format a pool ID consistently
 pub fn format_pool_id(pool_address: &[u8]) -> String {
@@ -67,7 +72,13 @@ pub fn maybe_create_component(
             component = component.with_contracts(&[
                 pool_deployed.pool.clone(),     // The deployed pool contract
                 pool_deployed.vault0.clone(),   // Vault0 contract
-                pool_deployed.vault1.clone()   // Vault1 contract
+                pool_deployed.vault1.clone(),   // Vault1 contract
+                EVC_ADDRESS.to_vec(),           // EVC address
+                EVK_EVAULT_IMPL.to_vec(),       // eVault implementation
+                EVK_VAULT_MODULE_IMPL.to_vec(), // Vault module implementation
+                EVK_BORROWING_MODULE_IMPL.to_vec(), // Borrowing module implementation
+                EVK_GOVERNANCE_MODULE_IMPL.to_vec(), // Governance module implementation
+                EVK_GENERIC_FACTORY.to_vec()    // Generic factory
             ]);
             
             // Add attributes

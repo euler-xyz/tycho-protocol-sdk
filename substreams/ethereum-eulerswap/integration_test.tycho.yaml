@@ -32,7 +32,7 @@ tests:
   - name: test_pool_creation
     # Indexed block range
     start_block: 21986045
-    stop_block: 21986080
+    stop_block: 21986064
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
       - "0xa66957e58b60d6b92b850c8773a9ff9b0ba96a65" # This is the USDC vault in Euler lending protocol that will hold the USDC for the pool

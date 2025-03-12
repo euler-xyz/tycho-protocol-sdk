@@ -410,7 +410,7 @@ fn map_protocol_changes(
                 .is_some() || 
                 // Check if this address is a vault for any component
                 components_store
-                    .get_last(vault_key(&format_pool_id(addr)))
+                    .get_last(vault_key(&store_address(addr)))
                     .is_some() ||
                 addr.eq(EVC_ADDRESS) ||
                 addr.eq(EULERSWAP_PERIPHERY) ||
