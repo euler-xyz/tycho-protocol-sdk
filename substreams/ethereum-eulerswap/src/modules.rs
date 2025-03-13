@@ -17,15 +17,16 @@
 use crate::pool_factories::{self, format_pool_id};
 use anyhow::Result;
 use itertools::Itertools;
+use keccak_hash::keccak;
 use std::collections::HashMap;
 #[allow(unused_imports)]
-use substreams::{pb::substreams::StoreDeltas, prelude::*, hex};
-use substreams_ethereum::{pb::eth, Event};
+use substreams::{hex, pb::substreams::StoreDeltas, prelude::*};
+use substreams_ethereum::{
+    pb::eth::{self, v2::StorageChange},
+    Event,
+};
 use tycho_substreams::{
-    balances::aggregate_balances_changes, 
-    contract::extract_contract_changes_builder,
-    prelude::*,
-    abi::erc20,
+    balances::aggregate_balances_changes, contract::extract_contract_changes_builder, prelude::*,
 };
 
 pub const EVC_ADDRESS: &[u8] = &hex!("0C9a3dd6b8F28529d72d7f9cE918D493519EE383");
@@ -38,13 +39,13 @@ pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb
 
 // Store key prefixes and suffixes for consistency
 const POOL_PREFIX: &str = "pool:";
+const TOKEN_PREFIX: &str = "token:";
+const VAULT_PREFIX: &str = "vault:";
 const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
-const TOKEN_PREFIX: &str = "token:";
-const VAULT_PREFIX: &str = "vault:";
-
+const ASSET_SUFFIX: &str = ":asset";
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
     format!("{}{}", POOL_PREFIX, pool_id)
@@ -66,6 +67,11 @@ fn pool_vault_key(pool_id: &str, is_vault0: bool) -> String {
     } else {
         format!("{}{}{}", POOL_PREFIX, pool_id, VAULT1_SUFFIX)
     }
+}
+
+/// Format a store key for a pool's vault
+fn vault_asset_key(vault_id: &str) -> String {
+    format!("{}{}{}", VAULT_PREFIX, vault_id, ASSET_SUFFIX)
 }
 
 /// Format a store key for a token lookup
@@ -139,57 +145,132 @@ fn store_protocol_components(
                 .for_each(|pc| {
                     // Extract the pool ID (should already be in "0x{hex}" format)
                     let pool_id = &pc.id;
-                    
+
                     // Store using consistent format "pool:{ID}" -> full pool ID
                     store.set(0, pool_key(pool_id), pool_id);
-                    
+
                     // Store token addresses
                     // Store asset0 (token 0) with consistent formatting
                     let token0_addr = &store_address(&pc.tokens[0]);
-                    store.set(
-                        0,
-                        pool_asset_key(pool_id, true),
-                        token0_addr,
-                    );
-                    
+                    store.set(0, pool_asset_key(pool_id, true), token0_addr);
+
                     // Add reverse index for token lookup
                     store.set(0, token_key(token0_addr), token0_addr);
-                    
+
                     // Store asset1 (token 1) with consistent formatting
                     let token1_addr = &store_address(&pc.tokens[1]);
-                    store.set(
-                        0,
-                        pool_asset_key(pool_id, false),
-                        token1_addr,
-                    );
-                    
+                    store.set(0, pool_asset_key(pool_id, false), token1_addr);
+
                     // Add reverse index for token lookup
                     store.set(0, token_key(token1_addr), token1_addr);
 
                     // Store vault addresses
                     // Store vault0 (contract 1) with consistent formatting
                     let vault0_addr = &store_address(&pc.contracts[1]);
-                    store.set(
-                        0,
-                        pool_vault_key(pool_id, true),
-                        vault0_addr,
-                    );
-                    
+                    store.set(0, pool_vault_key(pool_id, true), vault0_addr);
+
                     // Add reverse index for vault lookup
                     store.set(0, vault_key(vault0_addr), vault0_addr);
-                    
+
+                    // Store vault0 asset
+                    store.set(0, vault_asset_key(vault0_addr), token0_addr);
+
                     // Store vault1 (contract 2) with consistent formatting
                     let vault1_addr = &store_address(&pc.contracts[2]);
-                    store.set(
-                        0,
-                        pool_vault_key(pool_id, false),
-                        vault1_addr,
-                    );
-                    
+                    store.set(0, pool_vault_key(pool_id, false), vault1_addr);
+
                     // Add reverse index for vault lookup
                     store.set(0, vault_key(vault1_addr), vault1_addr);
+
+                    // Store vault1 asset
+                    store.set(0, vault_asset_key(vault1_addr), token1_addr);
                 })
         });
+}
+
+// Structure to hold the final balance value for a token in a vault
+struct VaultBalance {
+    ordinal: u64,
+    value: Vec<u8>,
+}
+
+// Function to extract final balances from EulerSwap vaults by tracking ERC20 storage
+fn get_eulerswap_vaults_balances(
+    transaction: &eth::v2::TransactionTrace,
+    components_store: &StoreGetString,
+) -> HashMap<Vec<u8>, HashMap<Vec<u8>, VaultBalance>> {
+    // Maps vault address -> (token address -> balance)
+    let mut vault_balances: HashMap<Vec<u8>, HashMap<Vec<u8>, VaultBalance>> = HashMap::new();
+
+    // Process all contracts in this transaction and look for vault balance changes
+    transaction
+        .calls
+        .iter()
+        .filter(|call| !call.state_reverted)
+        .for_each(|call| {
+            let vault_address_str = store_address(&call.address);
+
+            // Check if this call is directly on a vault that we have in store
+            if components_store
+                .get_last(&vault_key(&vault_address_str))
+                .is_some()
+            {
+                if crate::abi::evk_vault::functions::Deposit::match_call(call) || crate::abi::evk_vault::functions::Withdraw::match_call(call) || crate::abi::evk_vault::functions::Borrow::match_call(call) || crate::abi::evk_vault::functions::RepayWithShares::match_call(call) {
+                    for change in &call.storage_changes {
+                        if let Some(asset_address) =
+                            components_store.get_last(&vault_asset_key(&vault_address_str))
+                        {
+                            add_change_if_accounted(
+                                &mut vault_balances,
+                                change,
+                                &decode_address(&vault_address_str),
+                                &decode_address(&asset_address),
+                                components_store,
+                            );
+                        }
+                    }
+                }
+            }
+        });
+
+    vault_balances
+}
+
+fn add_change_if_accounted(
+    vault_balances: &mut HashMap<Vec<u8>, HashMap<Vec<u8>, VaultBalance>>,
+    change: &StorageChange,
+    vault_address: &[u8],
+    token_address: &[u8],
+    components_store: &StoreGetString,
+) {
+    let slot_key = get_storage_key_for_token(token_address);
+    // record changes happening on vault contract at reserves_of storage key
+    if change.key == slot_key && components_store.has_last(hex::encode(token_address)) {
+        vault_balances
+            .entry(vault_address.to_vec())
+            .or_insert_with(HashMap::new)
+            .entry(token_address.to_vec())
+            .and_modify(|v| {
+                if v.ordinal < change.ordinal {
+                    v.value = change.new_value.clone();
+                    v.ordinal = change.ordinal;
+                }
+            })
+            .or_insert(VaultBalance { value: change.new_value.clone(), ordinal: change.ordinal });
+    }
+}
+
+// token_addr -> keccak256(abi.encode(token_address, 0)) as 0 is slot number where the _balances mapping is declared
+// in ERC20 contracts
+fn get_storage_key_for_token(token_address: &[u8]) -> Vec<u8> {
+    let mut input: [u8; 64] = [0u8; 64];
+    input[12..32].copy_from_slice(token_address);
+    // Using slot 0 for the _balances mapping in ERC20 tokens
+    input[63] = 0u8;
+    let result = keccak(input.as_slice())
+        .as_bytes()
+        .to_vec();
+    result
 }
 
 /// Maps token balance deltas for each EulerSwap pool component in a block
@@ -211,18 +292,23 @@ fn map_relative_component_balance(
         .logs()
         .flat_map(|log| {
             let mut deltas = Vec::new();
-            
+
             // Try to decode the PoolDeployed event from the factory
-            if let Some(deploy_event) = crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log.log) {
+            if let Some(deploy_event) =
+                crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log.log)
+            {
                 // Format the pool ID consistently
                 let pool_id = format_pool_id(&deploy_event.pool);
-                
+
                 // Check if the pool is already in the store
-                if store.get_last(pool_key(&pool_id)).is_some() {
+                if store
+                    .get_last(pool_key(&pool_id))
+                    .is_some()
+                {
                     // Get token addresses from the event
                     let asset0_bytes = deploy_event.asset0.clone();
                     let asset1_bytes = deploy_event.asset1.clone();
-                    
+
                     // Add reserve0 as the initial balance for asset0
                     if deploy_event.reserve0 > substreams::scalar::BigInt::from(0) {
                         deltas.push(BalanceDelta {
@@ -230,10 +316,12 @@ fn map_relative_component_balance(
                             tx: Some(log.receipt.transaction.into()),
                             token: asset0_bytes.clone(),
                             component_id: pool_id.clone().into_bytes(),
-                            delta: deploy_event.reserve0.to_signed_bytes_be(),
+                            delta: deploy_event
+                                .reserve0
+                                .to_signed_bytes_be(),
                         });
                     }
-                    
+
                     // Add reserve1 as the initial balance for asset1
                     if deploy_event.reserve1 > substreams::scalar::BigInt::from(0) {
                         deltas.push(BalanceDelta {
@@ -241,25 +329,31 @@ fn map_relative_component_balance(
                             tx: Some(log.receipt.transaction.into()),
                             token: asset1_bytes.clone(),
                             component_id: pool_id.clone().into_bytes(),
-                            delta: deploy_event.reserve1.to_signed_bytes_be(),
+                            delta: deploy_event
+                                .reserve1
+                                .to_signed_bytes_be(),
                         });
                     }
                 }
             }
-            
+
             // Try to decode the Swap event
-            if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log) {
+            if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log)
+            {
                 // Format the pool ID consistently
                 let pool_id = format_pool_id(log.address());
-                
+
                 // Check if the log emitter is a known pool
-                if store.get_last(pool_key(&pool_id)).is_some() {
+                if store
+                    .get_last(pool_key(&pool_id))
+                    .is_some()
+                {
                     // Get token addresses from the store
                     if let Some(asset0) = store.get_last(pool_asset_key(&pool_id, true)) {
                         if let Some(asset1) = store.get_last(pool_asset_key(&pool_id, false)) {
                             let asset0_bytes = decode_address(&asset0);
                             let asset1_bytes = decode_address(&asset1);
-                            
+
                             // Add amount0In as a positive delta if > 0
                             if swap_event.amount0_in > substreams::scalar::BigInt::from(0) {
                                 deltas.push(BalanceDelta {
@@ -267,10 +361,12 @@ fn map_relative_component_balance(
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset0_bytes.clone(),
                                     component_id: pool_id.clone().into_bytes(),
-                                    delta: swap_event.amount0_in.to_signed_bytes_be(),
+                                    delta: swap_event
+                                        .amount0_in
+                                        .to_signed_bytes_be(),
                                 });
                             }
-                            
+
                             // Add amount1In as a positive delta if > 0
                             if swap_event.amount1_in > substreams::scalar::BigInt::from(0) {
                                 deltas.push(BalanceDelta {
@@ -278,10 +374,12 @@ fn map_relative_component_balance(
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset1_bytes.clone(),
                                     component_id: pool_id.clone().into_bytes(),
-                                    delta: swap_event.amount1_in.to_signed_bytes_be(),
+                                    delta: swap_event
+                                        .amount1_in
+                                        .to_signed_bytes_be(),
                                 });
                             }
-                            
+
                             // Add amount0Out as a negative delta if > 0
                             if swap_event.amount0_out > substreams::scalar::BigInt::from(0) {
                                 deltas.push(BalanceDelta {
@@ -289,10 +387,13 @@ fn map_relative_component_balance(
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset0_bytes.clone(),
                                     component_id: pool_id.clone().into_bytes(),
-                                    delta: swap_event.amount0_out.neg().to_signed_bytes_be(),
+                                    delta: swap_event
+                                        .amount0_out
+                                        .neg()
+                                        .to_signed_bytes_be(),
                                 });
                             }
-                            
+
                             // Add amount1Out as a negative delta if > 0
                             if swap_event.amount1_out > substreams::scalar::BigInt::from(0) {
                                 deltas.push(BalanceDelta {
@@ -300,14 +401,17 @@ fn map_relative_component_balance(
                                     tx: Some(log.receipt.transaction.into()),
                                     token: asset1_bytes.clone(),
                                     component_id: pool_id.clone().into_bytes(),
-                                    delta: swap_event.amount1_out.neg().to_signed_bytes_be(),
+                                    delta: swap_event
+                                        .amount1_out
+                                        .neg()
+                                        .to_signed_bytes_be(),
                                 });
                             }
                         }
                     }
                 }
             }
-            
+
             deltas
         })
         .collect::<Vec<_>>();
@@ -357,35 +461,35 @@ fn map_protocol_changes(
 
     // Aggregate newly created components per tx
     new_components
-    .tx_components
-    .iter()
-    .for_each(|tx_component| {
-        // Initialize builder if not yet present for this tx
-        let tx = tx_component.tx.as_ref().unwrap();
-        let builder = transaction_changes
-            .entry(tx.index)
-            .or_insert_with(|| TransactionChangesBuilder::new(tx));
+        .tx_components
+        .iter()
+        .for_each(|tx_component| {
+            // Initialize builder if not yet present for this tx
+            let tx = tx_component.tx.as_ref().unwrap();
+            let builder = transaction_changes
+                .entry(tx.index)
+                .or_insert_with(|| TransactionChangesBuilder::new(tx));
 
-        // Iterate over individual components created within this tx
-        tx_component
-            .components
-            .iter()
-            .for_each(|component| {
-                // Add the component to the builder
-                builder.add_protocol_component(component);
-                
-                // Create attributes with the correct balance owner
-                let mut component_attributes = default_attributes.clone();
-                // Set the balance owner to the pool address
-                component_attributes[0].value = decode_address(&component.id);
-                
-                // Add entity changes with the attributes
-                builder.add_entity_change(&EntityChanges {
-                    component_id: component.id.clone(),
-                    attributes: component_attributes,
+            // Iterate over individual components created within this tx
+            tx_component
+                .components
+                .iter()
+                .for_each(|component| {
+                    // Add the component to the builder
+                    builder.add_protocol_component(component);
+
+                    // Create attributes with the correct balance owner
+                    let mut component_attributes = default_attributes.clone();
+                    // Set the balance owner to the pool address
+                    component_attributes[0].value = decode_address(&component.id);
+
+                    // Add entity changes with the attributes
+                    builder.add_entity_change(&EntityChanges {
+                        component_id: component.id.clone(),
+                        attributes: component_attributes,
+                    });
                 });
-            });
-    });
+        });
 
     // Aggregate absolute balances per transaction.
     aggregate_balances_changes(balance_store, deltas)
@@ -408,86 +512,58 @@ fn map_protocol_changes(
         &block,
         |addr| {
             let addr_str = store_address(addr);
-            
+
             // Check if this address belongs to a known pool using consistent formatting
             let is_pool = components_store
                 .get_last(pool_key(&addr_str))
                 .is_some();
-            
+
             // Check if address is any known token
             // let is_token: bool = components_store
             //     .get_last(token_key(&addr_str))
             //     .is_some();
-                
+
             // Check if address is any known vault
             let is_vault = components_store
                 .get_last(vault_key(&addr_str))
                 .is_some();
-                
+
             // Check if this address is one of the known fixed addresses
-            let is_known_fixed_address = addr.eq(EVC_ADDRESS) ||
-                addr.eq(EULERSWAP_PERIPHERY) ||
-                addr.eq(EVK_EVAULT_IMPL) ||
-                addr.eq(EVK_VAULT_MODULE_IMPL) ||
-                addr.eq(EVK_BORROWING_MODULE_IMPL) ||
-                addr.eq(EVK_GOVERNANCE_MODULE_IMPL) ||
-                addr.eq(EVK_GENERIC_FACTORY);
-            
+            let is_known_fixed_address = addr.eq(EVC_ADDRESS)
+                || addr.eq(EULERSWAP_PERIPHERY)
+                || addr.eq(EVK_EVAULT_IMPL)
+                || addr.eq(EVK_VAULT_MODULE_IMPL)
+                || addr.eq(EVK_BORROWING_MODULE_IMPL)
+                || addr.eq(EVK_GOVERNANCE_MODULE_IMPL)
+                || addr.eq(EVK_GENERIC_FACTORY);
+
             is_pool || is_vault || is_known_fixed_address
         },
         &mut transaction_changes,
     );
 
-    // Track ERC20 Transfer events for vault balances
-    // Process all Transfer events in the block related to vaults
+    // Extract token balances for EulerSwap vaults using storage tracking
     block
-        .logs()
-        .for_each(|log| {
-            // Look for Transfer events from ERC20 tokens
-            if let Some(transfer) = erc20::events::Transfer::match_and_decode(log.log) {
-                let from_str = store_address(&transfer.from);
-                let to_str = store_address(&transfer.to);
-                let token_address = log.address().to_vec();
-                
-                // Check if sender is a known vault
-                if components_store.get_last(vault_key(&from_str)).is_some() {
-                    // This is a transfer out of a vault
-                    let vault_address = decode_address(&from_str);
-                    let mut vault_change = InterimContractChange::new(&vault_address, true);
-                    
-                    // Add token balance delta (negative since tokens are leaving)
-                    vault_change.upsert_token_balance(
-                        &token_address, 
-                        &transfer.value.neg().to_signed_bytes_be()
-                    );
-                    
-                    // Add the contract change to the builder
-                    let tycho_tx: Transaction = Transaction::from(log.receipt.transaction);
-                    let builder = transaction_changes
-                        .entry(tycho_tx.index.into())
-                        .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
-                        
-                    builder.add_contract_changes(&vault_change);
-                }
-                
-                // Check if receiver is a known vault
-                if components_store.get_last(vault_key(&to_str)).is_some() {
-                    // This is a transfer into a vault
-                    let vault_address = decode_address(&to_str);
-                    let mut vault_change = InterimContractChange::new(&vault_address, true);
-                    
-                    // Add token balance delta (positive since tokens are entering)
-                    vault_change.upsert_token_balance(
-                        &token_address,
-                        &transfer.value.to_signed_bytes_be()
-                    );
-                    
-                    let tycho_tx: Transaction = Transaction::from(log.receipt.transaction);
-                    let builder = transaction_changes
-                        .entry(tycho_tx.index.into())
-                        .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+        .transaction_traces
+        .iter()
+        .for_each(|tx| {
+            let vault_balances = get_eulerswap_vaults_balances(tx, &components_store);
 
-                    builder.add_contract_changes(&vault_change);
+            if !vault_balances.is_empty() {
+                let tycho_tx = Transaction::from(tx);
+                let builder = transaction_changes
+                    .entry(tycho_tx.index.into())
+                    .or_insert_with(|| TransactionChangesBuilder::new(&tycho_tx));
+
+                // Process each vault's final balances
+                for (vault_address, token_balances) in vault_balances {
+                    let mut vault_contract_change =
+                        InterimContractChange::new(&vault_address, false);
+
+                    for (token_addr, balance) in token_balances {
+                        vault_contract_change.upsert_token_balance(&token_addr, &balance.value);
+                    }
+                    builder.add_contract_changes(&vault_contract_change);
                 }
             }
         });
@@ -501,12 +577,15 @@ fn map_protocol_changes(
                 .changed_contracts()
                 .map(|e| e.to_vec())
                 .collect::<Vec<_>>();
-                
+
             addresses
                 .into_iter()
                 .for_each(|address: Vec<u8>| {
                     let address_str = store_address(&address);
-                    if !components_store.get_last(vault_key(&address_str)).is_some() {
+                    if !components_store
+                        .get_last(vault_key(&address_str))
+                        .is_some()
+                    {
                         // We reconstruct the component_id from the address here
                         let pool_id = format_pool_id(&address);
                         if let Some(component_id) = components_store.get_last(pool_key(&pool_id)) {
