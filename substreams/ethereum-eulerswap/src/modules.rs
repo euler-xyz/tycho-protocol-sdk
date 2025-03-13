@@ -14,7 +14,7 @@
 //! - Address format is standardized as "0x{hex}" throughout
 //! - Store keys follow consistent patterns: "pool:{id}" and "pool:{id}:{property}"
 //! - Balance tracking focuses on Swap events and initial deployments
-use crate::pool_factories::{self, format_pool_id};
+use crate::pool_factories::{self, format_component_id};
 use anyhow::Result;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -38,12 +38,12 @@ pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb
 
 // Store key prefixes and suffixes for consistency
 const POOL_PREFIX: &str = "pool:";
+const TOKEN_PREFIX: &str = "token:";
+const VAULT_PREFIX: &str = "vault:";
 const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
-const TOKEN_PREFIX: &str = "token:";
-const VAULT_PREFIX: &str = "vault:";
 
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
@@ -80,7 +80,7 @@ fn vault_key(vault_addr: &str) -> String {
 
 /// Store an address in a consistent format
 fn store_address(address: &[u8]) -> String {
-    format_pool_id(address)
+    format_component_id(address)
 }
 
 /// Decode an address string back to bytes
@@ -88,6 +88,74 @@ fn decode_address(address_str: &str) -> Vec<u8> {
     // Skip the "0x" prefix
     // This function uses the 'hex' module imported above
     hex::decode(&address_str[2..]).unwrap_or_default()
+}
+
+/// Determine if a component is a swap type based on its component_type attribute
+/// 
+/// Returns true if the component is a swap type (pool), false if it's a lend type (vault)
+fn is_swap_component(component: &ProtocolComponent) -> bool {
+    // Use the get_attribute_value method to directly access the component_type attribute
+    component.get_attribute_value("component_type")
+        .map_or(false, |value| value == "EulerSwap".as_bytes())
+}
+
+/// Map a swap component to the store
+fn store_swap_component(component: &ProtocolComponent, store: &StoreSetString) {
+    // Extract the pool ID (should already be in "0x{hex}" format)
+    let pool_id = &component.id;
+    
+    // Store using consistent format "pool:{ID}" -> full pool ID
+    store.set(0, pool_key(pool_id), pool_id);
+    
+    // Store token addresses
+    // Store asset0 with consistent formatting
+    let token0_addr = &store_address(&component.tokens[0]);
+    store.set(
+        0,
+        pool_asset_key(pool_id, true),
+        token0_addr,
+    );
+    
+    // Add reverse index for token lookup
+    store.set(0, token_key(token0_addr), token0_addr);
+    
+    // Store asset1 with consistent formatting
+    let token1_addr = &store_address(&component.tokens[1]);
+    store.set(
+        0,
+        pool_asset_key(pool_id, false),
+        token1_addr,
+    );
+    
+    // Add reverse index for token lookup
+    store.set(0, token_key(token1_addr), token1_addr);
+
+    // Store vault addresses - but only the pool-to-vault mapping
+    // Store vault0 (contract 1) address in pool relationship
+    let vault0_addr: &String = &store_address(&component.contracts[1]);
+    store.set(
+        0,
+        pool_vault_key(pool_id, true),
+        vault0_addr,
+    );
+    
+    // Store vault1 (contract 2) address in pool relationship
+    let vault1_addr = &store_address(&component.contracts[2]);
+    store.set(
+        0,
+        pool_vault_key(pool_id, false),
+        vault1_addr,
+    );
+}
+
+/// Map a lend component to the store
+fn store_lend_component(component: &ProtocolComponent, store: &StoreSetString) {
+    // The vault ID is the component ID
+    let vault_addr = &component.id;
+    
+    // Store in vault lookup - this is the centralized place for vault registration
+    store.set(0, vault_key(vault_addr), vault_addr);
+    
 }
 
 /// Find and create all relevant protocol components
@@ -137,57 +205,27 @@ fn store_protocol_components(
                 .components
                 .into_iter()
                 .for_each(|pc| {
-                    // Extract the pool ID (should already be in "0x{hex}" format)
-                    let pool_id = &pc.id;
-                    
-                    // Store using consistent format "pool:{ID}" -> full pool ID
-                    store.set(0, pool_key(pool_id), pool_id);
-                    
-                    // Store token addresses
-                    // Store asset0 (token 0) with consistent formatting
-                    let token0_addr = &store_address(&pc.tokens[0]);
-                    store.set(
-                        0,
-                        pool_asset_key(pool_id, true),
-                        token0_addr,
-                    );
-                    
-                    // Add reverse index for token lookup
-                    store.set(0, token_key(token0_addr), token0_addr);
-                    
-                    // Store asset1 (token 1) with consistent formatting
-                    let token1_addr = &store_address(&pc.tokens[1]);
-                    store.set(
-                        0,
-                        pool_asset_key(pool_id, false),
-                        token1_addr,
-                    );
-                    
-                    // Add reverse index for token lookup
-                    store.set(0, token_key(token1_addr), token1_addr);
+                    // Check if it's a swap or lend component
+                    if is_swap_component(&pc) {
+                        // Process as swap component
+                        store_swap_component(&pc, &store);
 
-                    // Store vault addresses
-                    // Store vault0 (contract 1) with consistent formatting
-                    let vault0_addr = &store_address(&pc.contracts[1]);
-                    store.set(
-                        0,
-                        pool_vault_key(pool_id, true),
-                        vault0_addr,
-                    );
-                    
-                    // Add reverse index for vault lookup
-                    store.set(0, vault_key(vault0_addr), vault0_addr);
-                    
-                    // Store vault1 (contract 2) with consistent formatting
-                    let vault1_addr = &store_address(&pc.contracts[2]);
-                    store.set(
-                        0,
-                        pool_vault_key(pool_id, false),
-                        vault1_addr,
-                    );
-                    
-                    // Add reverse index for vault lookup
-                    store.set(0, vault_key(vault1_addr), vault1_addr);
+                        // Also register the vaults from swap components
+                        if pc.contracts.len() > 1 {
+                            // Register vault0
+                            let vault0_addr = &store_address(&pc.contracts[1]);
+                            store.set(0, vault_key(vault0_addr), vault0_addr);
+
+                            // Register vault1 if it exists
+                            if pc.contracts.len() > 2 {
+                                let vault1_addr = &store_address(&pc.contracts[2]);
+                                store.set(0, vault_key(vault1_addr), vault1_addr);
+                            }
+                        }
+                    } else {
+                        // Process as lend component
+                        store_lend_component(&pc, &store);
+                    }
                 })
         });
 }
@@ -215,7 +253,7 @@ fn map_relative_component_balance(
             // Try to decode the PoolDeployed event from the factory
             if let Some(deploy_event) = crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log.log) {
                 // Format the pool ID consistently
-                let pool_id = format_pool_id(&deploy_event.pool);
+                let pool_id = format_component_id(&deploy_event.pool);
                 
                 // Check if the pool is already in the store
                 if store.get_last(pool_key(&pool_id)).is_some() {
@@ -250,7 +288,7 @@ fn map_relative_component_balance(
             // Try to decode the Swap event
             if let Some(swap_event) = crate::abi::eulerswap::events::Swap::match_and_decode(log.log) {
                 // Format the pool ID consistently
-                let pool_id = format_pool_id(log.address());
+                let pool_id = format_component_id(log.address());
                 
                 // Check if the log emitter is a known pool
                 if store.get_last(pool_key(&pool_id)).is_some() {
@@ -376,7 +414,7 @@ fn map_protocol_changes(
                 
                 // Create attributes with the correct balance owner
                 let mut component_attributes = default_attributes.clone();
-                // Set the balance owner to the pool address
+                // Set the balance owner to the component address
                 component_attributes[0].value = decode_address(&component.id);
                 
                 // Add entity changes with the attributes
@@ -506,9 +544,15 @@ fn map_protocol_changes(
                 .into_iter()
                 .for_each(|address: Vec<u8>| {
                     let address_str = store_address(&address);
-                    if !components_store.get_last(vault_key(&address_str)).is_some() {
+                    
+                    // Check if address is a known vault
+                    if components_store.get_last(vault_key(&address_str)).is_some() {
+                        // This is a known vault, we want to mark the vault component as updated
+                        // The component ID for vaults is the same as their address
+                        change.mark_component_as_updated(&address_str);
+                    } else {
                         // We reconstruct the component_id from the address here
-                        let pool_id = format_pool_id(&address);
+                        let pool_id = format_component_id(&address);
                         if let Some(component_id) = components_store.get_last(pool_key(&pool_id)) {
                             change.mark_component_as_updated(&component_id);
                         }

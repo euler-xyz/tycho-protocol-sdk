@@ -32,7 +32,7 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 21986045
+    start_block: 21894700
     stop_block: 21986064
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
