@@ -19,6 +19,7 @@ hex = "0.4.3"
 itertools = "0.10.5"
 serde = "1.0.217"
 serde-sibor = "0.1.0"
+keccak-hash = "0.10.0"
 
 
 [build-dependencies]
