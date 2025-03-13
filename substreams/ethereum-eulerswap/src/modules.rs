@@ -243,9 +243,10 @@ fn add_change_if_accounted(
     token_address: &[u8],
     components_store: &StoreGetString,
 ) {
-    let slot_key = get_storage_key_for_token(token_address);
+    let slot_key = get_storage_key_for_token(vault_address);
     // record changes happening on vault contract at reserves_of storage key
-    if change.key == slot_key && components_store.has_last(hex::encode(token_address)) {
+    // if change.key == slot_key && components_store.has_last(hex::encode(token_address)) {
+    if change.key == slot_key {
         vault_balances
             .entry(vault_address.to_vec())
             .or_insert_with(HashMap::new)
