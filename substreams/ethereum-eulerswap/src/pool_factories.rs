@@ -89,7 +89,7 @@ pub fn maybe_create_component(
             
             // Add attributes
             component = component.with_attributes(&[
-                ("pool_type", "EulerSwap".as_bytes()),
+                ("component_type", "EulerSwap".as_bytes()),
                 ("euler_account", &pool_deployed.euler_account),
                 ("fee_multiplier", &pool_deployed.fee_multiplier.to_signed_bytes_be()),
                 ("reserves", &json_serialize_bigint_list(&reserves)),
@@ -126,7 +126,7 @@ pub fn maybe_create_component(
             
             // Add attributes
             component = component.with_attributes(&[
-                ("vault_type", "EulerLending".as_bytes()),
+                ("component_type", "EulerLending".as_bytes()),
                 ("upgradeable", if proxy_created.upgradeable { &[1u8] } else { &[0u8] }),
                 ("trailing_data_length", &(proxy_created.trailing_data.len() as u32).to_be_bytes()),
                 // Add stateless contract address
@@ -137,15 +137,9 @@ pub fn maybe_create_component(
                 ("stateless_contract_addr_4", &EVK_GENERIC_FACTORY),
                 ("manual_updates", &[1u8]),
             ]);
-            
-            // Set protocol type as Lend instead of Swap for vaults
-            component.protocol_type = Some(tycho_substreams::models::ProtocolType {
-                name: "eulerswap".to_string(),
-                financial_type: tycho_substreams::models::FinancialType::Lend.into(),
-                attribute_schema: vec![],
-                implementation_type: ImplementationType::Vm.into(),
-            });
-            
+                        
+            component = component.as_swap_type("eulerswap", ImplementationType::Vm);
+
             Some(component)
         }
         _ => None,

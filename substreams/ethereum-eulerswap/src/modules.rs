@@ -38,13 +38,12 @@ pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb
 
 // Store key prefixes and suffixes for consistency
 const POOL_PREFIX: &str = "pool:";
+const TOKEN_PREFIX: &str = "token:";
+const VAULT_PREFIX: &str = "vault:";
 const ASSET0_SUFFIX: &str = ":asset0";
 const ASSET1_SUFFIX: &str = ":asset1";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
-const TOKEN_PREFIX: &str = "token:";
-const VAULT_PREFIX: &str = "vault:";
-const LENDING_VAULT_PREFIX: &str = "lending_vault:";
 
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
@@ -79,11 +78,6 @@ fn vault_key(vault_addr: &str) -> String {
     format!("{}{}", VAULT_PREFIX, vault_addr)
 }
 
-/// Format a store key for a lending vault
-fn lending_vault_key(vault_addr: &str) -> String {
-    format!("{}{}", LENDING_VAULT_PREFIX, vault_addr)
-}
-
 /// Store an address in a consistent format
 fn store_address(address: &[u8]) -> String {
     format_component_id(address)
@@ -96,14 +90,13 @@ fn decode_address(address_str: &str) -> Vec<u8> {
     hex::decode(&address_str[2..]).unwrap_or_default()
 }
 
-/// Determine if a component is a swap type based on its protocol_type
+/// Determine if a component is a swap type based on its component_type attribute
 /// 
 /// Returns true if the component is a swap type (pool), false if it's a lend type (vault)
 fn is_swap_component(component: &ProtocolComponent) -> bool {
-    // Check if the financial_type is Swap (which is 0)
-    // Lend type is 1
-    let financial_type: i32 = tycho_substreams::models::FinancialType::Swap.into();
-    component.protocol_type.as_ref().unwrap().financial_type == financial_type
+    // Use the get_attribute_value method to directly access the component_type attribute
+    component.get_attribute_value("component_type")
+        .map_or(false, |value| value == "EulerSwap".as_bytes())
 }
 
 /// Map a swap component to the store
@@ -115,7 +108,7 @@ fn store_swap_component(component: &ProtocolComponent, store: &StoreSetString) {
     store.set(0, pool_key(pool_id), pool_id);
     
     // Store token addresses
-    // Store asset0 (token 0) with consistent formatting
+    // Store asset0 with consistent formatting
     let token0_addr = &store_address(&component.tokens[0]);
     store.set(
         0,
@@ -126,7 +119,7 @@ fn store_swap_component(component: &ProtocolComponent, store: &StoreSetString) {
     // Add reverse index for token lookup
     store.set(0, token_key(token0_addr), token0_addr);
     
-    // Store asset1 (token 1) with consistent formatting
+    // Store asset1 with consistent formatting
     let token1_addr = &store_address(&component.tokens[1]);
     store.set(
         0,
@@ -137,28 +130,22 @@ fn store_swap_component(component: &ProtocolComponent, store: &StoreSetString) {
     // Add reverse index for token lookup
     store.set(0, token_key(token1_addr), token1_addr);
 
-    // Store vault addresses
-    // Store vault0 (contract 1) with consistent formatting
-    let vault0_addr = &store_address(&component.contracts[1]);
+    // Store vault addresses - but only the pool-to-vault mapping
+    // Store vault0 (contract 1) address in pool relationship
+    let vault0_addr: &String = &store_address(&component.contracts[1]);
     store.set(
         0,
         pool_vault_key(pool_id, true),
         vault0_addr,
     );
     
-    // Add reverse index for vault lookup
-    store.set(0, vault_key(vault0_addr), vault0_addr);
-    
-    // Store vault1 (contract 2) with consistent formatting
+    // Store vault1 (contract 2) address in pool relationship
     let vault1_addr = &store_address(&component.contracts[2]);
     store.set(
         0,
         pool_vault_key(pool_id, false),
         vault1_addr,
     );
-    
-    // Add reverse index for vault lookup
-    store.set(0, vault_key(vault1_addr), vault1_addr);
 }
 
 /// Map a lend component to the store
@@ -166,21 +153,9 @@ fn store_lend_component(component: &ProtocolComponent, store: &StoreSetString) {
     // The vault ID is the component ID
     let vault_addr = &component.id;
     
-    // Store using consistent format "lending_vault:{ID}" -> full vault ID
-    store.set(0, lending_vault_key(vault_addr), vault_addr);
-    
-    // Store in vault lookup
+    // Store in vault lookup - this is the centralized place for vault registration
     store.set(0, vault_key(vault_addr), vault_addr);
     
-    // Store the implementation address if available (should be the first contract after the vault)
-    if component.contracts.len() > 1 {
-        let implementation_addr = &store_address(&component.contracts[1]);
-        store.set(
-            0,
-            format!("{}:implementation", lending_vault_key(vault_addr)),
-            implementation_addr
-        );
-    }
 }
 
 /// Find and create all relevant protocol components
@@ -234,6 +209,19 @@ fn store_protocol_components(
                     if is_swap_component(&pc) {
                         // Process as swap component
                         store_swap_component(&pc, &store);
+
+                        // Also register the vaults from swap components
+                        if pc.contracts.len() > 1 {
+                            // Register vault0
+                            let vault0_addr = &store_address(&pc.contracts[1]);
+                            store.set(0, vault_key(vault0_addr), vault0_addr);
+
+                            // Register vault1 if it exists
+                            if pc.contracts.len() > 2 {
+                                let vault1_addr = &store_address(&pc.contracts[2]);
+                                store.set(0, vault_key(vault1_addr), vault1_addr);
+                            }
+                        }
                     } else {
                         // Process as lend component
                         store_lend_component(&pc, &store);
@@ -500,7 +488,7 @@ fn map_protocol_changes(
                 let token_address = log.address().to_vec();
                 
                 // Check if sender is a known vault
-                if components_store.get_last(lending_vault_key(&from_str)).is_some() {
+                if components_store.get_last(vault_key(&from_str)).is_some() {
                     // This is a transfer out of a vault
                     let vault_address = decode_address(&from_str);
                     let mut vault_change = InterimContractChange::new(&vault_address, true);
@@ -521,7 +509,7 @@ fn map_protocol_changes(
                 }
                 
                 // Check if receiver is a known vault
-                if components_store.get_last(lending_vault_key(&to_str)).is_some() {
+                if components_store.get_last(vault_key(&to_str)).is_some() {
                     // This is a transfer into a vault
                     let vault_address = decode_address(&to_str);
                     let mut vault_change = InterimContractChange::new(&vault_address, true);
@@ -558,7 +546,7 @@ fn map_protocol_changes(
                     let address_str = store_address(&address);
                     
                     // Check if address is a known vault
-                    if components_store.get_last(lending_vault_key(&address_str)).is_some() {
+                    if components_store.get_last(vault_key(&address_str)).is_some() {
                         // This is a known vault, we want to mark the vault component as updated
                         // The component ID for vaults is the same as their address
                         change.mark_component_as_updated(&address_str);
