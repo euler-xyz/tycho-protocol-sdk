@@ -286,8 +286,8 @@ fn add_change_if_accounted(
         // In a real application, you might want to convert this to a BigInt or similar format
         let extracted_value = cash_value.to_vec();
         
-        store.set(0, "test" + vault_address, extracted_value.clone());
-        
+        // store.set(0, "test" + vault_address, extracted_value.clone());
+
         // Store the extracted value
         vault_balances
             .entry(vault_address.to_vec())
