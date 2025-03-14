@@ -243,7 +243,7 @@ fn add_change_if_accounted(
     token_address: &[u8],
     components_store: &StoreGetString,
 ) {
-    let slot_key = get_storage_key_for_token(vault_address);
+    let slot_key = get_storage_key_for_vault_balance(vault_address);
     // record changes happening on vault contract at reserves_of storage key
     // if change.key == slot_key && components_store.has_last(hex::encode(token_address)) {
     if change.key == slot_key {
@@ -261,11 +261,11 @@ fn add_change_if_accounted(
     }
 }
 
-// token_addr -> keccak256(abi.encode(token_address, 0)) as 0 is slot number where the _balances mapping is declared
-// in ERC20 contracts
-fn get_storage_key_for_token(token_address: &[u8]) -> Vec<u8> {
+// Compute storage slot for vault balance in ERC20 contract
+// Returns keccak256(abi.encode(vault_address, 0)) where 0 is the slot number of the _balances mapping in ERC20 contracts
+fn get_storage_key_for_vault_balance(vault_address: &[u8]) -> Vec<u8> {
     let mut input: [u8; 64] = [0u8; 64];
-    input[12..32].copy_from_slice(token_address);
+    input[12..32].copy_from_slice(vault_address);
     // Using slot 0 for the _balances mapping in ERC20 tokens
     input[63] = 0u8;
     let result = keccak(input.as_slice())
