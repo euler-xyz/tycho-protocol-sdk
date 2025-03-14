@@ -283,7 +283,6 @@ fn add_change_if_accounted(
         
         // 4. Convert to a standard format for storage
         // For uint112, we'll store all 14 bytes
-        // In a real application, you might want to convert this to a BigInt or similar format
         let extracted_value = cash_value.to_vec();
         
         // store.set(0, "test" + vault_address, extracted_value.clone());
