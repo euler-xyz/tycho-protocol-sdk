@@ -243,35 +243,90 @@ fn add_change_if_accounted(
     token_address: &[u8],
     components_store: &StoreGetString,
 ) {
-    let slot_key = get_storage_key_for_vault_balance(vault_address);
-    // record changes happening on vault contract at reserves_of storage key
-    // if change.key == slot_key && components_store.has_last(hex::encode(token_address)) {
+    let slot_key = get_storage_key_for_vault_cash();
+    
+    // Check if the change is for the first slot of VaultStorage 
+    // (which contains the cash field among others)
     if change.key == slot_key {
+        // Extract the cash value from the packed slot
+        let new_value = &change.new_value;
+        
+        // The cash value (Assets type = uint112) is stored after the lastInterestAccumulatorUpdate field
+        // lastInterestAccumulatorUpdate is uint48 (6 bytes), so cash starts at bit 48
+        
+        // 1. Check if we have enough bytes in the slot value
+        // We need at least 20 bytes (6 bytes for lastInterestAccumulatorUpdate + 14 bytes for cash)
+        if new_value.len() < 20 {
+            // Not enough bytes in the value, can't extract cash
+            return;
+        }
+        
+        // 2. Extract the cash value (uint112 = 14 bytes)
+        // Starting from byte 6 (after 48 bits of lastInterestAccumulatorUpdate)
+        // 
+        // Note on Ethereum storage packing:
+        // Solidity packs multiple values into a single 32-byte slot when possible
+        // In this case, the packed slot contains:
+        // - lastInterestAccumulatorUpdate (uint48): 6 bytes
+        // - cash (uint112): 14 bytes
+        // 
+        // We're only interested in the cash field, which is bytes 6-19 of the slot
+        let mut cash_value = vec![0u8; 14];
+        for i in 0..14 {
+            if i + 6 < new_value.len() {
+                cash_value[i] = new_value[i + 6];
+            }
+        }
+        
+        // 3. Log the extracted value for debugging if needed
+        substreams::log::info!("Extracted cash bytes: {:?}", cash_value);
+        
+        // 4. Convert to a standard format for storage
+        // For uint112, we'll store all 14 bytes
+        // In a real application, you might want to convert this to a BigInt or similar format
+        let extracted_value = cash_value.to_vec();
+        
+        store.set(0, "test" + vault_address, extracted_value.clone());
+        
+        // Store the extracted value
         vault_balances
             .entry(vault_address.to_vec())
             .or_insert_with(HashMap::new)
             .entry(token_address.to_vec())
             .and_modify(|v| {
                 if v.ordinal < change.ordinal {
-                    v.value = change.new_value.clone();
+                    v.value = extracted_value.clone();
                     v.ordinal = change.ordinal;
                 }
             })
-            .or_insert(VaultBalance { value: change.new_value.clone(), ordinal: change.ordinal });
+            .or_insert(VaultBalance { value: extracted_value, ordinal: change.ordinal });
     }
 }
 
-// Compute storage slot for vault balance in ERC20 contract
-// Returns keccak256(abi.encode(vault_address, 0)) where 0 is the slot number of the _balances mapping in ERC20 contracts
-fn get_storage_key_for_vault_balance(vault_address: &[u8]) -> Vec<u8> {
-    let mut input: [u8; 64] = [0u8; 64];
-    input[12..32].copy_from_slice(vault_address);
-    // Using slot 0 for the _balances mapping in ERC20 tokens
-    input[63] = 0u8;
-    let result = keccak(input.as_slice())
-        .as_bytes()
-        .to_vec();
-    result
+/// Compute storage slot for vault's internal 'cash' field
+/// 
+/// Based on the provided storage layout:
+/// - The vaultStorage field is at slot 2 in the Storage contract
+/// - Within vaultStorage struct, the cash field is in the first packed slot
+/// - Cash is an Assets type (uint112) at offset 6 bytes (after lastInterestAccumulatorUpdate which is uint48) 
+///
+/// This function returns the base storage slot for VaultStorage.
+/// To extract the cash value, the code would need to:
+/// 1. Read the entire slot (32 bytes)
+/// 2. Skip the first 6 bytes (48 bits) that belong to lastInterestAccumulatorUpdate
+/// 3. Extract the next 14 bytes (112 bits) that represent the cash value
+fn get_storage_key_for_vault_cash() -> Vec<u8> {
+    // Vault storage is at slot 2 in the Storage contract
+    let mut slot_bytes: [u8; 32] = [0u8; 32];
+    slot_bytes[31] = 2u8;
+    
+    // Calculate the base slot of the struct: keccak256(2)
+    // This gives us the starting position for vaultStorage
+    let base_slot = keccak(slot_bytes.as_slice()).as_bytes().to_vec();
+    
+    // The cash field is in the first packed slot (offset 0 from the base)
+    // If we needed other fields further into the struct, we'd add their offsets
+    base_slot
 }
 
 /// Maps token balance deltas for each EulerSwap pool component in a block
