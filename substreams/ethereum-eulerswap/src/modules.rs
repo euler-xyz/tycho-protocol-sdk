@@ -17,7 +17,6 @@
 use crate::pool_factories::{self, format_pool_id};
 use anyhow::Result;
 use itertools::Itertools;
-use keccak_hash::keccak;
 use std::collections::HashMap;
 #[allow(unused_imports)]
 use substreams::{hex, pb::substreams::StoreDeltas, prelude::*};
@@ -46,6 +45,8 @@ const ASSET1_SUFFIX: &str = ":asset1";
 const VAULT0_SUFFIX: &str = ":vault0";
 const VAULT1_SUFFIX: &str = ":vault1";
 const ASSET_SUFFIX: &str = ":asset";
+
+
 /// Format a store key for a pool
 fn pool_key(pool_id: &str) -> String {
     format!("{}{}", POOL_PREFIX, pool_id)
@@ -206,31 +207,38 @@ fn get_eulerswap_vaults_balances(
     transaction
         .calls
         .iter()
-        .filter(|call| !call.state_reverted)
+        .filter(|call| !call.state_reverted &&
+        (
+            crate::abi::evk_vault::functions::Deposit::match_call(call) || crate::abi::evk_vault::functions::Withdraw::match_call(call) || crate::abi::evk_vault::functions::Borrow::match_call(call) || crate::abi::evk_vault::functions::RepayWithShares::match_call(call)
+        ))
         .for_each(|call| {
             let vault_address_str = store_address(&call.address);
 
             // Check if this call is directly on a vault that we have in store
-            if components_store
-                .get_last(&vault_key(&vault_address_str))
-                .is_some()
-            {
-                if crate::abi::evk_vault::functions::Deposit::match_call(call) || crate::abi::evk_vault::functions::Withdraw::match_call(call) || crate::abi::evk_vault::functions::Borrow::match_call(call) || crate::abi::evk_vault::functions::RepayWithShares::match_call(call) {
-                    for change in &call.storage_changes {
-                        if let Some(asset_address) =
-                            components_store.get_last(&vault_asset_key(&vault_address_str))
-                        {
-                            add_change_if_accounted(
-                                &mut vault_balances,
-                                change,
-                                &decode_address(&vault_address_str),
-                                &decode_address(&asset_address),
-                                components_store,
-                            );
-                        }
+            call
+            .storage_changes
+            .iter()
+            .filter(|sc| components_store
+                .get_last(&vault_key(&store_address(&sc.address)))
+                .is_some())
+            .for_each(|sc| {
+                substreams::log::debug!(
+                    "Processing call to contract: {} with storage changes for {}",
+                    vault_address_str,
+                    store_address(&sc.address)
+                );
+
+                if let Some(asset_address) =
+                        components_store.get_last(&vault_asset_key(&store_address(&sc.address)))
+                    {
+                        add_change_if_accounted(
+                            &mut vault_balances,
+                            sc,
+                            &sc.address,
+                            &decode_address(&asset_address)
+                        );
                     }
-                }
-            }
+            });
         });
 
     vault_balances
@@ -241,25 +249,35 @@ fn add_change_if_accounted(
     change: &StorageChange,
     vault_address: &[u8],
     token_address: &[u8],
-    components_store: &StoreGetString,
 ) {
+    substreams::log::debug!(
+        "add_change_if_accounted"
+    );
+
     let slot_key = get_storage_key_for_vault_cash();
-    
+
     // Check if the change is for the first slot of VaultStorage 
     // (which contains the cash field among others)
-    if change.key == slot_key {
+    if change.key == slot_key {    
+        substreams::log::debug!(
+            "slot_key {:?}",
+            slot_key
+        );
+    
+        substreams::log::debug!(
+            "change.key {:?}",
+            change.key
+        );
+    
         // Extract the cash value from the packed slot
         let new_value = &change.new_value;
-        
+        substreams::log::debug!(
+            "new_value {:?}",
+            new_value
+        );
+    
         // The cash value (Assets type = uint112) is stored after the lastInterestAccumulatorUpdate field
         // lastInterestAccumulatorUpdate is uint48 (6 bytes), so cash starts at bit 48
-        
-        // // We need at least 20 bytes (6 bytes for lastInterestAccumulatorUpdate + 14 bytes for cash)
-        // if new_value.len() < 20 {
-        //     // Not enough bytes in the value, can't extract cash
-        //     return;
-        // }
-        
         // Extract the cash value (uint112 = 14 bytes)
         // Starting from byte 6 (after 48 bits of lastInterestAccumulatorUpdate)
         // 
@@ -274,14 +292,16 @@ fn add_change_if_accounted(
                 cash_value[i] = new_value[i + 6];
             }
         }
-        
-        // substreams::log::info!("Extracted cash bytes: {:?}", cash_value);
-        
+                
         // Convert to a standard format for storage
         // For uint112, we'll store all 14 bytes
         let extracted_value = cash_value.to_vec();
         
-        // store.set(0, "test" + vault_address, extracted_value.clone());
+        substreams::log::debug!(
+            "extracted_value {:?}",
+            extracted_value
+        );
+    
 
         // Store the extracted value
         vault_balances
@@ -289,7 +309,7 @@ fn add_change_if_accounted(
             .or_insert_with(HashMap::new)
             .entry(token_address.to_vec())
             .and_modify(|v| {
-                if v.ordinal < change.ordinal {
+                if v.ordinal < change.ordinal {            
                     v.value = extracted_value.clone();
                     v.ordinal = change.ordinal;
                 }
@@ -305,17 +325,14 @@ fn add_change_if_accounted(
 /// - Within vaultStorage struct, the cash field is in the first packed slot
 /// - Cash is an Assets type (uint112) at offset 6 bytes (after lastInterestAccumulatorUpdate which is uint48) 
 ///
-/// This function returns the base storage slot for VaultStorage.
+/// This function returns slot 2 where vaultStorage is stored.
 fn get_storage_key_for_vault_cash() -> Vec<u8> {
     // Vault storage is at slot 2 in the Storage contract
     let mut slot_bytes: [u8; 32] = [0u8; 32];
-    slot_bytes[31] = 2u8;
+    slot_bytes[31] = 2u8; // Set the last byte to 2
     
-    // Calculate the base slot of the struct: keccak256(2)
-    // This gives us the starting position for vaultStorage
-    let base_slot = keccak(slot_bytes.as_slice()).as_bytes().to_vec();
-    
-    base_slot
+    // Return slot 2 directly (no hashing needed for direct struct fields)
+    slot_bytes.to_vec()
 }
 
 /// Maps token balance deltas for each EulerSwap pool component in a block
@@ -594,6 +611,11 @@ fn map_protocol_changes(
         .for_each(|tx| {
             let vault_balances = get_eulerswap_vaults_balances(tx, &components_store);
 
+            substreams::log::debug!(
+                "vault_balances.is_empty() {:?}",
+                vault_balances.is_empty()
+            );
+
             if !vault_balances.is_empty() {
                 let tycho_tx = Transaction::from(tx);
                 let builder = transaction_changes
@@ -602,12 +624,38 @@ fn map_protocol_changes(
 
                 // Process each vault's final balances
                 for (vault_address, token_balances) in vault_balances {
+
+                    substreams::log::debug!(
+                        "vault_address {:?}",
+                        store_address(&vault_address)
+                    );
+
+
                     let mut vault_contract_change =
                         InterimContractChange::new(&vault_address, false);
 
                     for (token_addr, balance) in token_balances {
+                        substreams::log::debug!(
+                            "token_addr {:?}",
+                            store_address(&token_addr)
+                        );  
+    
+                        substreams::log::debug!(
+                            "balance {:?}",
+                            balance.value
+                        );
+
+                        // Convert to human-readable format
+                        let big_int = substreams::scalar::BigInt::from_unsigned_bytes_be(&balance.value);
+                        substreams::log::debug!(
+                            "balance (human readable): {} (raw: {})",
+                            big_int.clone() / substreams::scalar::BigInt::from(1_000_000), // Divided by 10^6 for 6 decimals
+                            big_int
+                        );
+
                         vault_contract_change.upsert_token_balance(&token_addr, &balance.value);
                     }
+                    
                     builder.add_contract_changes(&vault_contract_change);
                 }
             }
