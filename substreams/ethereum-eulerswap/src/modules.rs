@@ -212,8 +212,6 @@ fn get_eulerswap_vaults_balances(
             crate::abi::evk_vault::functions::Deposit::match_call(call) || crate::abi::evk_vault::functions::Withdraw::match_call(call) || crate::abi::evk_vault::functions::Borrow::match_call(call) || crate::abi::evk_vault::functions::RepayWithShares::match_call(call)
         ))
         .for_each(|call| {
-            let vault_address_str = store_address(&call.address);
-
             // Check if this call is directly on a vault that we have in store
             call
             .storage_changes
@@ -222,12 +220,6 @@ fn get_eulerswap_vaults_balances(
                 .get_last(&vault_key(&store_address(&sc.address)))
                 .is_some())
             .for_each(|sc| {
-                substreams::log::debug!(
-                    "Processing call to contract: {} with storage changes for {}",
-                    vault_address_str,
-                    store_address(&sc.address)
-                );
-
                 if let Some(asset_address) =
                         components_store.get_last(&vault_asset_key(&store_address(&sc.address)))
                     {
@@ -250,25 +242,27 @@ fn add_change_if_accounted(
     vault_address: &[u8],
     token_address: &[u8],
 ) {
-    substreams::log::debug!(
-        "add_change_if_accounted"
-    );
-
     let slot_key = get_storage_key_for_vault_cash();
 
     // Check if the change is for the first slot of VaultStorage 
     // (which contains the cash field among others)
-    if change.key == slot_key {    
+    if change.key == slot_key {   
+        substreams::log::debug!(
+            "Processing call to contract: {} with storage changes for {}",
+            store_address(&vault_address),
+            store_address(&change.address)
+        );
+     
         substreams::log::debug!(
             "slot_key {:?}",
             slot_key
         );
-    
+
         substreams::log::debug!(
-            "change.key {:?}",
-            change.key
+            "old_value {:?}",
+            &change.old_value
         );
-    
+
         // Extract the cash value from the packed slot
         let new_value = &change.new_value;
         substreams::log::debug!(
@@ -293,13 +287,16 @@ fn add_change_if_accounted(
             }
         }
                 
-        // Convert to a standard format for storage
-        // For uint112, we'll store all 14 bytes
-        let extracted_value = cash_value.to_vec();
-        
+        // Convert to little-endian format
+        let mut little_endian_value = cash_value.clone();
+        little_endian_value.reverse();
+
+        // Create a BigInt with little-endian interpretation
+        let little_endian_big_int = substreams::scalar::BigInt::from_unsigned_bytes_le(&cash_value);
         substreams::log::debug!(
-            "extracted_value {:?}",
-            extracted_value
+            "balance (little-endian): {} (raw: {})",
+            little_endian_big_int.clone() / substreams::scalar::BigInt::from(1_000_000),
+            little_endian_big_int
         );
     
 
@@ -309,12 +306,12 @@ fn add_change_if_accounted(
             .or_insert_with(HashMap::new)
             .entry(token_address.to_vec())
             .and_modify(|v| {
-                if v.ordinal < change.ordinal {            
-                    v.value = extracted_value.clone();
+                if v.ordinal < change.ordinal && v.value != little_endian_value.clone() {            
+                    v.value = little_endian_value.clone();
                     v.ordinal = change.ordinal;
                 }
             })
-            .or_insert(VaultBalance { value: extracted_value, ordinal: change.ordinal });
+            .or_insert(VaultBalance { value: little_endian_value, ordinal: change.ordinal });
     }
 }
 
@@ -611,12 +608,12 @@ fn map_protocol_changes(
         .for_each(|tx| {
             let vault_balances = get_eulerswap_vaults_balances(tx, &components_store);
 
-            substreams::log::debug!(
-                "vault_balances.is_empty() {:?}",
-                vault_balances.is_empty()
-            );
-
             if !vault_balances.is_empty() {
+                substreams::log::debug!(
+                    "vault_balances.is_empty() {:?}",
+                    vault_balances.is_empty()
+                );
+    
                 let tycho_tx = Transaction::from(tx);
                 let builder = transaction_changes
                     .entry(tycho_tx.index.into())
@@ -642,7 +639,7 @@ fn map_protocol_changes(
     
                         substreams::log::debug!(
                             "balance {:?}",
-                            balance.value
+                            balance.value.as_slice()
                         );
 
                         // Convert to human-readable format
@@ -653,9 +650,9 @@ fn map_protocol_changes(
                             big_int
                         );
 
-                        vault_contract_change.upsert_token_balance(&token_addr, &balance.value);
+                        vault_contract_change.upsert_token_balance(&token_addr, balance.value.as_slice());
                     }
-                    
+
                     builder.add_contract_changes(&vault_contract_change);
                 }
             }
