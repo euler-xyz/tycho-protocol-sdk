@@ -35,7 +35,7 @@ pub const EVK_VAULT_MODULE_IMPL: &[u8] = &hex!("b4ad4d9c02c01b01cf586c16f01c58c7
 pub const EVK_BORROWING_MODULE_IMPL: &[u8] = &hex!("639156f8feb0cd88205e4861a0224ec169605acf");
 pub const EVK_GOVERNANCE_MODULE_IMPL: &[u8] = &hex!("a61f5016f2cd5cec12d091f871fce1e1df5f0b67");
 pub const EVK_GENERIC_FACTORY: &[u8] = &hex!("29a56a1b8214d9cf7c5561811750d5cbdb45cc8e");
-
+pub const PERMIT_2 : &[u8] = &hex!("000000000022D473030F116dDEE9F6B43aC78BA3");
 // Store key prefixes and suffixes for consistency
 const POOL_PREFIX: &str = "pool:";
 const TOKEN_PREFIX: &str = "token:";
