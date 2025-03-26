@@ -1,6 +1,6 @@
 use crate::modules::{
     EVC_ADDRESS, EVK_BORROWING_MODULE_IMPL, EVK_EVAULT_IMPL, EVK_GENERIC_FACTORY,
-    EVK_GOVERNANCE_MODULE_IMPL, EVK_VAULT_MODULE_IMPL,
+    EVK_GOVERNANCE_MODULE_IMPL, EVK_VAULT_MODULE_IMPL, PERMIT_2,
 };
 use substreams::hex;
 use substreams_ethereum::pb::eth::v2::{Call, Log, TransactionTrace};
@@ -88,6 +88,7 @@ pub fn maybe_create_component(
                 ("stateless_contract_addr_2", &EVK_BORROWING_MODULE_IMPL),
                 ("stateless_contract_addr_3", &EVK_GOVERNANCE_MODULE_IMPL),
                 ("stateless_contract_addr_4", &EVK_GENERIC_FACTORY),
+                ("stateless_contract_addr_5", &PERMIT_2),
                 ("manual_updates", &[1u8]),
             ]);
 
