@@ -56,6 +56,7 @@ tests:
           stateless_contract_addr_2: "0x639156f8feb0cd88205e4861a0224ec169605acf"
           stateless_contract_addr_3: "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67"
           stateless_contract_addr_4: "0x29a56a1b8214d9cf7c5561811750d5cbdb45cc8e"
+          stateless_contract_addr_5: "0x000000000022D473030F116dDEE9F6B43aC78BA3"
           manual_updates: "0x01"
         creation_tx: "0x3202a00fef545ef75c85557a5f671a3546e1c1cbdfe3681b46f2e05eae09181a"
         # Whether or not the script should skip trying to simulate a swap on this component.
