@@ -1,7 +1,4 @@
-use crate::modules::{
-    EVC_ADDRESS, EVK_BORROWING_MODULE_IMPL, EVK_EVAULT_IMPL, EVK_GENERIC_FACTORY,
-    EVK_GOVERNANCE_MODULE_IMPL, EVK_VAULT_MODULE_IMPL, PERMIT_2,
-};
+use crate::modules::{EULERSWAP_PERIPHERY, EVC_ADDRESS, EVK_GENERIC_FACTORY};
 use substreams::hex;
 use substreams_ethereum::pb::eth::v2::{Call, Log, TransactionTrace};
 use substreams_ethereum::{Event, Function};
@@ -26,7 +23,7 @@ pub fn format_pool_id(pool_address: &[u8]) -> String {
 /// - Token pair addresses
 /// - Associated contract addresses (pool, vaults)
 /// - Pool attributes (type, swap account, fees, prices)
-/// Otherwise returns None.
+///   Otherwise returns None.
 pub fn maybe_create_component(
     call: &Call,
     log: &Log,
@@ -67,6 +64,8 @@ pub fn maybe_create_component(
                 pool_deployed.vault0.clone(), // Vault0 contract
                 pool_deployed.vault1.clone(), // Vault1 contract
                 EVC_ADDRESS.to_vec(),         // EVC address
+                EULERSWAP_PERIPHERY.to_vec(), // EulerSwap periphery address
+                EVK_GENERIC_FACTORY.to_vec(), // EVK Generic factory address
             ]);
 
             // Add attributes
@@ -82,13 +81,6 @@ pub fn maybe_create_component(
                 ("reserves", &json_serialize_bigint_list(&reserves)),
                 ("prices", &json_serialize_bigint_list(&prices)),
                 ("concentrations", &json_serialize_bigint_list(&concentrations)),
-                // Add stateless contract address
-                ("stateless_contract_addr_0", &EVK_EVAULT_IMPL),
-                ("stateless_contract_addr_1", &EVK_VAULT_MODULE_IMPL),
-                ("stateless_contract_addr_2", &EVK_BORROWING_MODULE_IMPL),
-                ("stateless_contract_addr_3", &EVK_GOVERNANCE_MODULE_IMPL),
-                ("stateless_contract_addr_4", &EVK_GENERIC_FACTORY),
-                ("stateless_contract_addr_5", &PERMIT_2),
                 ("manual_updates", &[1u8]),
             ]);
 
