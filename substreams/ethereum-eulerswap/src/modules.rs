@@ -251,7 +251,7 @@ fn add_change_if_accounted(
     // (which contains the cash field among others)
     if change.key == slot_key {
         substreams::log::debug!(
-            "Processing call to contract: {} with storage changes for {} at block",
+            "Processing call to contract: {} with storage changes for {}",
             store_address(vault_address),
             store_address(&change.address),
         );
