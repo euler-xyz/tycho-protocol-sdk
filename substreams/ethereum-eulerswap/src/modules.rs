@@ -251,9 +251,9 @@ fn add_change_if_accounted(
     // (which contains the cash field among others)
     if change.key == slot_key {
         substreams::log::debug!(
-            "Processing call to contract: {} with storage changes for {}",
+            "Processing call to contract: {} with storage changes for {} at block",
             store_address(vault_address),
-            store_address(&change.address)
+            store_address(&change.address),
         );
 
         substreams::log::debug!("slot_key {:?}", slot_key);
@@ -266,31 +266,23 @@ fn add_change_if_accounted(
 
         // The cash value (Assets type = uint112) is stored after the lastInterestAccumulatorUpdate field
         // lastInterestAccumulatorUpdate is uint48 (6 bytes), so cash starts at bit 48
-        // Extract the cash value (uint112 = 14 bytes)
-        // Starting from byte 6 (after 48 bits of lastInterestAccumulatorUpdate)
+        // Extract the cash value (uint112 = 14 bytes), starting from byte 12
         //
-        // The packed slot contains:
+        // The packed slot contains (starting from least significant bit):
         // - lastInterestAccumulatorUpdate (uint48): 6 bytes
         // - cash (uint112): 14 bytes
         // - remaining fields...
-        // We're only interested in the cash field, which is bytes 6-19 of the slot
-        let mut cash_value = vec![0u8; 14];
-        for i in 0..14 {
-            if i + 6 < new_value.len() {
-                cash_value[i] = new_value[i + 6];
-            }
-        }
+        // We're only interested in the cash field, which is bytes 12-26 of the slot
 
-        // Convert to little-endian format
-        let mut little_endian_value = cash_value.clone();
-        little_endian_value.reverse();
+        let mut cash_value = vec![0u8; 32];
+        cash_value[18..].copy_from_slice(&new_value[12..26]);
 
-        // Create a BigInt with little-endian interpretation
-        let little_endian_big_int = substreams::scalar::BigInt::from_unsigned_bytes_le(&cash_value);
+        // Create a BigInt from bytes vector for logging
+        let cash_big_int = substreams::scalar::BigInt::from_unsigned_bytes_be(&cash_value);
         substreams::log::debug!(
-            "balance (little-endian): {} (raw: {})",
-            little_endian_big_int.clone() / substreams::scalar::BigInt::from(1_000_000),
-            little_endian_big_int
+            "balance: {} (raw: {})",
+            cash_big_int.clone() / substreams::scalar::BigInt::from(1_000_000),
+            cash_big_int
         );
 
         // Store the extracted value
@@ -299,12 +291,12 @@ fn add_change_if_accounted(
             .or_default()
             .entry(token_address.to_vec())
             .and_modify(|v| {
-                if v.ordinal < change.ordinal && v.value != little_endian_value.clone() {
-                    v.value = little_endian_value.clone();
+                if v.ordinal < change.ordinal && v.value != cash_value.clone() {
+                    v.value = cash_value.clone();
                     v.ordinal = change.ordinal;
                 }
             })
-            .or_insert(VaultBalance { value: little_endian_value, ordinal: change.ordinal });
+            .or_insert(VaultBalance { value: cash_value, ordinal: change.ordinal });
     }
 }
 
