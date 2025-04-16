@@ -15,11 +15,13 @@ cd ../../evm/
 ### Build & Run
 
 - To build the substream, run `cargo build --release --target wasm32-unknown-unknown`
-- To run the substream, run `substreams gui substreams.yaml map_protocol_changes`
+- To run the substream, run `substreams gui ./substreams.yaml -e mainnet.eth.streamingfast.io:443 -t 22031891 --limit-processed-blocks 100000`
 
 ### Testing
 
 #### Running python Tycho Indexer tests
+
+Make sure to run `setup_env.sh` in testing folder, this will download python dependency and set conda virtual env.
 
 ```bash
 # Activate conda environment
