@@ -125,9 +125,10 @@ contract EulerSwapAdapter is ISwapAdapter {
         override
         returns (Capability[] memory capabilities)
     {
-        capabilities = new Capability[](2);
+        capabilities = new Capability[](3);
         capabilities[0] = Capability.SellOrder;
         capabilities[1] = Capability.BuyOrder;
+        capabilities[2] = Capability.TokenBalanceIndependent;
     }
 
     /// @notice Calculates pool prices for specified amounts

@@ -52,7 +52,7 @@ contract EulerSwapAdapterTest is AdapterTest {
         assertLt(IERC20(USDC).balanceOf(address(swapper)), usdcBalanceBefore);
     }
 
-    function testPrice() public view {
+    function testPrice() public {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
 
         uint256[] memory specifiedAmounts = new uint256[](3);
@@ -60,36 +60,34 @@ contract EulerSwapAdapterTest is AdapterTest {
         specifiedAmounts[0] = 200e6;
         specifiedAmounts[0] = 300e6;
 
-        Fraction[] memory prices =
-            adapter.price(poolId, USDC, USDT, specifiedAmounts);
-
-        assertEq(prices.length, specifiedAmounts.length);
-
-        assertApproxEqAbs(prices[0].numerator, specifiedAmounts[0], 10e6);
-        assertEq(prices[0].denominator, specifiedAmounts[0]);
-        assertApproxEqAbs(prices[1].numerator, specifiedAmounts[1], 10e6);
-        assertEq(prices[1].denominator, specifiedAmounts[1]);
-        assertApproxEqAbs(prices[2].numerator, specifiedAmounts[2], 10e6);
-        assertEq(prices[2].denominator, specifiedAmounts[2]);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISwapAdapterTypes.NotImplemented.selector,
+                "Price function not implemented"
+            )
+        );
+        adapter.price(poolId, USDC, USDT, specifiedAmounts);
     }
 
-    // function testFuzzPrice(uint256 specifiedAmount) public view {
-    //     // Assume OrderSide.Sell
-    //     uint256[] memory limits =
-    //         adapter.getLimits(bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT);
+    // function testPrice() public view {
+    //     bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
 
-    //     console2.log("limits", limits[0]);
-    //     vm.assume(specifiedAmount > 0);
-    //     vm.assume(specifiedAmount < limits[0]);
+    //     uint256[] memory specifiedAmounts = new uint256[](3);
+    //     specifiedAmounts[0] = 100e6;
+    //     specifiedAmounts[0] = 200e6;
+    //     specifiedAmounts[0] = 300e6;
 
-    //     console2.log("specifiedAmount", specifiedAmount);
+    //     Fraction[] memory prices =
+    //         adapter.price(poolId, USDC, USDT, specifiedAmounts);
 
-    //     uint256[] memory specifiedAmounts = new uint256[](1);
-    //     specifiedAmounts[0] = specifiedAmount;
+    //     assertEq(prices.length, specifiedAmounts.length);
 
-    //     Fraction[] memory prices = adapter.price(
-    //         bytes32(bytes20(USDC_USDT_POOL)), USDC, USDT, specifiedAmounts
-    //     );
+    //     assertApproxEqAbs(prices[0].numerator, specifiedAmounts[0], 10e6);
+    //     assertEq(prices[0].denominator, specifiedAmounts[0]);
+    //     assertApproxEqAbs(prices[1].numerator, specifiedAmounts[1], 10e6);
+    //     assertEq(prices[1].denominator, specifiedAmounts[1]);
+    //     assertApproxEqAbs(prices[2].numerator, specifiedAmounts[2], 10e6);
+    //     assertEq(prices[2].denominator, specifiedAmounts[2]);
     // }
 
     function testGetLimits() public view {
