@@ -22,8 +22,15 @@ initialized_accounts:
   - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
   - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
   - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
-  # - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" # USDC
-  # - "0xdac17f958d2ee523a2206206994597c13d831ec7" # USDT
+  - "0xb896f28969a04202564e4eaa494a7253e0e6f3dc" # IRMLinearKink?
+  - "0x1a34934a091fb8c030468bdf99d695fa3264ee30"
+  - "0x36f8c4b4c6a638bb38f49285c08e282c99db05fb" # EulerRouter
+  - "0x587cabe0521f5065b561a6e68c25f338ed037ff9" # ChainlinkOracle
+  - "0x3e7d1eab13ad0104d2750b8863b489d65364e32d"
+  - "0x0d5f4aadf3fde31bbb55db5f42c080f18ad54df5"
+  - "0x6213f24332d35519039f2afa7e3bffe105a37d3f"
+  - "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6"
+  - "0xc9e1a09622afdb659913fefe800feae5dbbfe9d7"
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"
