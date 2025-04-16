@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.13;
 
-import {ISwapAdapter} from "src/interfaces/ISwapAdapter.sol";
+import {ISwapAdapter, ISwapAdapterTypes} from "src/interfaces/ISwapAdapter.sol";
 import {IEulerSwap} from "src/eulerswap/IEulerSwap.sol";
 import {IEulerSwapFactory} from "src/eulerswap/IEulerSwapFactory.sol";
 import {IEulerSwapPeriphery} from "src/eulerswap/IEulerSwapPeriphery.sol";
@@ -59,18 +59,20 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     /// @inheritdoc ISwapAdapter
     function price(
-        bytes32 poolId,
-        address sellToken,
-        address buyToken,
-        uint256[] memory specifiedAmounts
-    ) external view override returns (Fraction[] memory prices) {
-        prices = new Fraction[](specifiedAmounts.length);
+        bytes32 /*poolId*/,
+        address /*sellToken*/,
+        address /*buyToken*/,
+        uint256[] memory /*specifiedAmounts*/
+    ) external pure override returns (Fraction[] memory) {
+        revert ISwapAdapterTypes.NotImplemented("Price function not implemented");
 
-        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-            prices[i] =
-                quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
-        }
+        // prices = new Fraction[](specifiedAmounts.length);
+
+        // IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
+        // for (uint256 i = 0; i < specifiedAmounts.length; i++) {
+        //     prices[i] =
+        //         quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
+        // }
     }
 
     /// @inheritdoc ISwapAdapter
@@ -123,10 +125,9 @@ contract EulerSwapAdapter is ISwapAdapter {
         override
         returns (Capability[] memory capabilities)
     {
-        capabilities = new Capability[](3);
+        capabilities = new Capability[](2);
         capabilities[0] = Capability.SellOrder;
         capabilities[1] = Capability.BuyOrder;
-        capabilities[2] = Capability.PriceFunction;
     }
 
     /// @notice Calculates pool prices for specified amounts

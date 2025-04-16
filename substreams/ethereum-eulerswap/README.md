@@ -8,14 +8,14 @@ This substream is used to extract data from the EulerSwap protocol.
 
 ```bash
 cd ../../evm/
-./scripts/buildRuntime.sh -c "EulerSwapAdapter" -s "constructor(address,address)" -a "0xF75548aF02f1928CbE9015985D4Fcbf96d728544,0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f"
+./scripts/buildRuntime.sh -c "EulerSwapAdapter" -s "constructor(address,address)" -a "0x79d3a7a9d203d352a655255BdB1a233623f536B7,0x829e7c83886323980BE76CedD837905cCEc3D738"
 
 ```
 
 ### Build & Run
 
 - To build the substream, run `cargo build --release --target wasm32-unknown-unknown`
-- To run the substream, run `substreams gui ./substreams.yaml -e mainnet.eth.streamingfast.io:443 -t 22031891 --limit-processed-blocks 100000`
+- To run the substream, run `substreams gui ./substreams.yaml -e mainnet.eth.streamingfast.io:443 -t 22195234 --limit-processed-blocks 100000`
 
 ### Testing
 

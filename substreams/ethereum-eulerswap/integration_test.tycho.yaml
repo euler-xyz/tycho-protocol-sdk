@@ -5,7 +5,7 @@ adapter_contract: "EulerSwapAdapter"
 # Constructor signature of the Adapter contract"
 adapter_build_signature: "constructor(address,address)"
 # A comma separated list of args to be passed to the contructor of the Adapter contract"
-adapter_build_args: "0xF75548aF02f1928CbE9015985D4Fcbf96d728544,0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f"
+adapter_build_args: "0x79d3a7a9d203d352a655255BdB1a233623f536B7,0x829e7c83886323980BE76CedD837905cCEc3D738"
 # Whether or not the testing script should skip checking balances of the protocol components.
 # If set to `true` please always add a reason why it's skipped.
 skip_balance_check: true
@@ -16,21 +16,21 @@ skip_balance_check: true
 # This will be applied to each test.
 initialized_accounts:
   - "0x0c9a3dd6b8f28529d72d7f9ce918d493519ee383" # This is the EVC address
-  - "0x813D74E832b3d9E9451d8f0E871E877edf2a5A5f" # EulerSwapPerihpery, actually not needed for this test
+  - "0x829e7c83886323980BE76CedD837905cCEc3D738" # EulerSwapPerihpery
   - "0x29a56a1b8214d9cf7c5561811750d5cbdb45cc8e" # EVK: GenericFactory contract
   - "0x8ff1c814719096b61abf00bb46ead0c9a529dd7d" # EVK: EVault implementation
   - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
   - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
   - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
-  - "0xb896f28969a04202564e4eaa494a7253e0e6f3dc" # IRMLinearKink?
-  - "0x1a34934a091fb8c030468bdf99d695fa3264ee30"
+  - "0xb896f28969a04202564e4eaa494a7253e0e6f3dc" # IRMLinearKink
+  - "0x1a34934a091fb8c030468bdf99d695fa3264ee30" # vault-0/1 dToken
   - "0x36f8c4b4c6a638bb38f49285c08e282c99db05fb" # EulerRouter
-  - "0x587cabe0521f5065b561a6e68c25f338ed037ff9" # ChainlinkOracle
-  - "0x3e7d1eab13ad0104d2750b8863b489d65364e32d"
-  - "0x0d5f4aadf3fde31bbb55db5f42c080f18ad54df5"
-  - "0x6213f24332d35519039f2afa7e3bffe105a37d3f"
-  - "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6"
-  - "0xc9e1a09622afdb659913fefe800feae5dbbfe9d7"
+  - "0x587cabe0521f5065b561a6e68c25f338ed037ff9" # USDT ChainlinkOracle Adapter
+  - "0x3e7d1eab13ad0104d2750b8863b489d65364e32d" # Chainlink contracts: EACAggregatorProxy
+  - "0x0d5f4aadf3fde31bbb55db5f42c080f18ad54df5" # Chainlink contracts: AccessControlledOCR2Aggregator
+  - "0x6213f24332d35519039f2afa7e3bffe105a37d3f" # USDC ChainlinkOracle Adapter
+  - "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6" # Chainlink contracts: EACAggregatorProxy
+  - "0xc9e1a09622afdb659913fefe800feae5dbbfe9d7" # Chainlink contracts: AccessControlledOCR2Aggregator
 # A list of protocol types names created by your Substreams module.
 protocol_type_names:
   - "eulerswap"
@@ -39,15 +39,15 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 21986045
-    stop_block: 21986064
+    start_block: 22195234
+    stop_block: 22195534
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
       - "0xa66957e58b60d6b92b850c8773a9ff9b0ba96a65" # This is the USDC vault in Euler lending protocol that will hold the USDC for the pool
       - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0x2bFED8dBEb8e6226a15300AC77eE9130E52410fE"
+      - id: "0xbf691f421bead4148c4789dbfa1839135b296a83"
         tokens:
           - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
           - "0xdac17f958d2ee523a2206206994597c13d831ec7"
@@ -59,7 +59,7 @@ tests:
           prices: "0x5b22307830646530623662336137363430303030222c22307830646530623662336137363430303030225d"
           concentrations: "0x5b22307830643736323164633538323130303030222c22307830643736323164633538323130303030225d"
           manual_updates: "0x01"
-        creation_tx: "0x3202a00fef545ef75c85557a5f671a3546e1c1cbdfe3681b46f2e05eae09181a"
+        creation_tx: "0x41182ff0eca236f3ab30f656afd10e9e6c67a5205d293e83f49de7828219548a"
         # Whether or not the script should skip trying to simulate a swap on this component.
         # If set to `true` please always add a reason why it's skipped.
         skip_simulation: false
