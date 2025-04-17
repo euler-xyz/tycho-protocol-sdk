@@ -55,6 +55,7 @@ contract EulerSwapAdapter is ISwapAdapter {
             ? pool.swap(amountOut, 0, msg.sender, "")
             : pool.swap(0, amountOut, msg.sender, "");
         trade.gasUsed = gasBefore - gasleft();
+        trade.price = Fraction(0, 1);
     }
 
     /// @inheritdoc ISwapAdapter
