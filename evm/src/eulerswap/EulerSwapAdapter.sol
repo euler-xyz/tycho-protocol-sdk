@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.27;
 
-import {ISwapAdapter, ISwapAdapterTypes} from "src/interfaces/ISwapAdapter.sol";
+import {
+    ISwapAdapter, ISwapAdapterTypes
+} from "src/interfaces/ISwapAdapter.sol";
 import {IEulerSwap} from "src/eulerswap/IEulerSwap.sol";
 import {IEulerSwapFactory} from "src/eulerswap/IEulerSwapFactory.sol";
 import {IEulerSwapPeriphery} from "src/eulerswap/IEulerSwapPeriphery.sol";
@@ -15,6 +17,24 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     IEulerSwapFactory immutable factory;
     IEulerSwapPeriphery immutable periphery;
+
+    uint32 internal constant POOL_STATUS_UNLOCKED = 1;
+
+    struct Limit {
+        uint256 limitIn;
+        uint256 limitOut;
+    }
+
+    struct PoolCache {
+        address token0;
+        uint112 reserve0;
+        uint112 reserve1;
+        Limit limit0to1;
+        Limit limit1to0;
+        bool initialized;
+    }
+
+    mapping(address eulerSwap => PoolCache) pools;
 
     constructor(address factory_, address periphery_) {
         factory = IEulerSwapFactory(factory_);
@@ -50,29 +70,28 @@ contract EulerSwapAdapter is ISwapAdapter {
 
         IERC20(sellToken).safeTransferFrom(msg.sender, address(pool), amountIn);
 
-        uint256 gasBefore = gasleft();
-        (isAmountOutAsset0)
-            ? pool.swap(amountOut, 0, msg.sender, "")
-            : pool.swap(0, amountOut, msg.sender, "");
-        trade.gasUsed = gasBefore - gasleft();
+        trade.gasUsed = 300000; //TODO set correct
         trade.price = Fraction(0, 1);
     }
 
     /// @inheritdoc ISwapAdapter
     function price(
-        bytes32 /*poolId*/,
-        address /*sellToken*/,
-        address /*buyToken*/,
+        bytes32, /*poolId*/
+        address, /*sellToken*/
+        address, /*buyToken*/
         uint256[] memory /*specifiedAmounts*/
     ) external pure override returns (Fraction[] memory) {
-        revert ISwapAdapterTypes.NotImplemented("Price function not implemented");
+        revert ISwapAdapterTypes.NotImplemented(
+            "Price function not implemented"
+        );
 
         // prices = new Fraction[](specifiedAmounts.length);
 
         // IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
         // for (uint256 i = 0; i < specifiedAmounts.length; i++) {
         //     prices[i] =
-        //         quoteExactInput(pool, sellToken, buyToken, specifiedAmounts[i]);
+        //         quoteExactInput(pool, sellToken, buyToken,
+        // specifiedAmounts[i]);
         // }
     }
 
@@ -83,10 +102,20 @@ contract EulerSwapAdapter is ISwapAdapter {
         override
         returns (uint256[] memory limits)
     {
-        limits = new uint256[](2);
         address pool = address(bytes20(poolId));
+        PoolCache storage cache = pools[pool];
 
-        (limits[0], limits[1]) = periphery.getLimits(pool, sellToken, buyToken);
+        limits = new uint256[](2);
+
+        if (cache.initialized) {
+            if (cache.token0 == sellToken) {
+                (limits[0], limits[1]) = (cache.limit0to1.limitIn, cache.limit0to1.limitOut);
+            } else {
+                (limits[0], limits[1]) = (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
+            }
+        } else {
+            (limits[0], limits[1]) = periphery.getLimits(pool, sellToken, buyToken);
+        }
     }
 
     /// @inheritdoc ISwapAdapter
@@ -138,13 +167,22 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountIn
-    ) internal view returns (Fraction memory calculatedPrice) {
-        calculatedPrice = Fraction(
-            periphery.quoteExactInput(
-                address(pool), tokenIn, tokenOut, amountIn
-            ),
-            amountIn
+    ) internal returns (Fraction memory calculatedPrice) {
+        PoolCache storage cache = loadPoolCache(address(pool));
+
+        (uint256 amountOut, uint112 newReserve0, uint112 newReserve1) =
+        periphery.quoteExactInputWithReserves(
+            address(pool),
+            tokenIn,
+            tokenOut,
+            amountIn,
+            cache.reserve0,
+            cache.reserve1
         );
+
+        updatePoolCache(cache, newReserve0, newReserve1, amountIn, amountOut, tokenIn);
+
+        calculatedPrice = Fraction(amountOut, amountIn);
     }
 
     function quoteExactOutput(
@@ -152,12 +190,81 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountOut
-    ) internal view returns (Fraction memory calculatedPrice) {
-        calculatedPrice = Fraction(
+    ) internal returns (Fraction memory calculatedPrice) {
+        PoolCache storage cache = loadPoolCache(address(pool));
+
+        (uint256 amountIn, uint112 newReserve0, uint112 newReserve1) = periphery
+            .quoteExactOutputWithReserves(
+            address(pool),
+            tokenIn,
+            tokenOut,
             amountOut,
-            periphery.quoteExactOutput(
-                address(pool), tokenIn, tokenOut, amountOut
-            )
+            cache.reserve0,
+            cache.reserve1
         );
+
+        updatePoolCache(cache, newReserve0, newReserve1, amountIn, amountOut, tokenIn);
+
+        calculatedPrice = Fraction(amountOut, amountIn);
     }
+
+    function loadPoolCache(address pool) internal returns (PoolCache storage) {
+        PoolCache storage cache = pools[pool];
+
+        if (!cache.initialized) {
+            (uint112 reserve0, uint112 reserve1, uint32 status) =
+                IEulerSwap(pool).getReserves();
+            if (status != POOL_STATUS_UNLOCKED) revert("Invalid pool state");
+
+            cache.reserve0 = reserve0;
+            cache.reserve1 = reserve1;
+
+            address token0 = IEVault(IEulerSwap(pool).vault0()).asset();
+            address token1 = IEVault(IEulerSwap(pool).vault1()).asset();
+
+            cache.token0 = token0;
+
+            (uint256 limitIn, uint256 limitOut) =
+                periphery.getLimits(pool, token0, token1);
+            cache.limit0to1 = Limit(limitIn, limitOut);
+            (limitIn, limitOut) = periphery.getLimits(pool, token1, token0);
+            cache.limit1to0 = Limit(limitIn, limitOut);
+
+            cache.initialized = true;
+        }
+        
+        return cache;
+    }
+
+    function updatePoolCache(
+        PoolCache storage cache,
+        uint112 newReserve0,
+        uint112 newReserve1,
+        uint256 amountIn,
+        uint256 amountOut,
+        address tokenIn
+    ) internal {
+        cache.reserve0 = newReserve0;
+        cache.reserve1 = newReserve1;
+
+        if (cache.token0 == tokenIn) {
+            require(cache.limit0to1.limitIn > amountIn, LimitExceeded(cache.limit0to1.limitIn));
+            require(cache.limit0to1.limitOut > amountOut, LimitExceeded(cache.limit0to1.limitOut));
+            cache.limit0to1.limitIn -= amountIn;
+            cache.limit0to1.limitOut -= amountOut;
+            cache.limit1to0.limitIn += amountOut;
+            cache.limit1to0.limitOut += amountIn;
+        } else {
+            require(cache.limit1to0.limitIn > amountIn, LimitExceeded(cache.limit1to0.limitIn));
+            require(cache.limit1to0.limitOut > amountOut, LimitExceeded(cache.limit1to0.limitOut));
+            cache.limit1to0.limitIn -= amountIn;
+            cache.limit1to0.limitOut -= amountOut;
+            cache.limit0to1.limitIn += amountOut;
+            cache.limit0to1.limitOut += amountIn;
+        }
+    }
+}
+
+interface IEVault {
+    function asset() external view returns (address);
 }
