@@ -170,7 +170,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        (uint256 amountOut, uint112 newReserve0, uint112 newReserve1) =
+        uint256 amountOut =
         periphery.quoteExactInputWithReserves(
             address(pool),
             tokenIn,
@@ -180,7 +180,7 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.reserve1
         );
 
-        updatePoolCache(cache, newReserve0, newReserve1, amountIn, amountOut, tokenIn);
+        updatePoolCache(cache, amountIn, amountOut, tokenIn);
 
         calculatedPrice = Fraction(amountOut, amountIn);
     }
@@ -193,7 +193,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        (uint256 amountIn, uint112 newReserve0, uint112 newReserve1) = periphery
+        uint256 amountIn = periphery
             .quoteExactOutputWithReserves(
             address(pool),
             tokenIn,
@@ -203,7 +203,7 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.reserve1
         );
 
-        updatePoolCache(cache, newReserve0, newReserve1, amountIn, amountOut, tokenIn);
+        updatePoolCache(cache, amountIn, amountOut, tokenIn);
 
         calculatedPrice = Fraction(amountOut, amountIn);
     }
@@ -238,14 +238,29 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     function updatePoolCache(
         PoolCache storage cache,
-        uint112 newReserve0,
-        uint112 newReserve1,
         uint256 amountIn,
         uint256 amountOut,
         address tokenIn
     ) internal {
-        cache.reserve0 = newReserve0;
-        cache.reserve1 = newReserve1;
+        uint256 amount0In;
+        uint256 amount0Out;
+        uint256 amount1In;
+        uint256 amount1Out;
+
+        if (cache.token0 == tokenIn) {
+            amount0In = amountIn;
+            amount1Out = amountOut;
+        } else {
+            amount0Out = amountOut;
+            amount1In = amountIn;
+        }
+
+        uint256 newReserve0 = cache.reserve0 + amount0In - amount0Out;
+        uint256 newReserve1 = cache.reserve1 + amount1In - amount1Out;
+
+
+        cache.reserve0 = uint112(newReserve0);
+        cache.reserve1 = uint112(newReserve1);
 
         if (cache.token0 == tokenIn) {
             require(cache.limit0to1.limitIn > amountIn, LimitExceeded(cache.limit0to1.limitIn));

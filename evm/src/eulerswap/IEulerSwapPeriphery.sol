@@ -46,7 +46,7 @@ interface IEulerSwapPeriphery {
         uint256 amountIn,
         uint112 reserve0,
         uint112 reserve1
-    ) external view returns (uint256, uint112, uint112);
+    ) external view returns (uint256);
 
     /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`? Starting with provided reserves.
     function quoteExactOutputWithReserves(
@@ -56,7 +56,7 @@ interface IEulerSwapPeriphery {
         uint256 amountOut,
         uint112 reserve0,
         uint112 reserve1
-    ) external view returns (uint256, uint112, uint112);
+    ) external view returns (uint256);
 
     /// @notice Max amount the pool can buy of tokenIn and sell of tokenOut
     function getLimits(address eulerSwap, address tokenIn, address tokenOut)
