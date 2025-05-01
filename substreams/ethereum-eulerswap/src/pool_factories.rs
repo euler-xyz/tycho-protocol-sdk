@@ -89,12 +89,12 @@ pub fn maybe_create_component(
 
             // Add contracts
             component = component.with_contracts(&[
-                pool_deployed.pool.clone(),   // The deployed pool contract
-                pool_config.params.0.clone(), // Vault0 contract
-                pool_config.params.1.clone(), // Vault1 contract
-                EVC_ADDRESS.to_vec(),         // EVC address
-                EULERSWAP_PERIPHERY.to_vec(), // EulerSwap periphery address
-                EVK_GENERIC_FACTORY.to_vec(), // EVK Generic factory address
+                pool_deployed.pool.clone(),        // The deployed pool contract
+                pool_config.params.0.clone(),      // Vault0 contract
+                pool_config.params.1.clone(),      // Vault1 contract
+                EVC_ADDRESS.to_vec(),              // EVC address
+                EULERSWAP_PERIPHERY.to_vec(),      // EulerSwap periphery address
+                EVK_GENERIC_FACTORY.to_vec(),      // EVK Generic factory address
             ]);
 
             // Add attributes
