@@ -27,11 +27,11 @@ pub fn format_pool_id(pool_address: &[u8]) -> String {
 pub fn maybe_create_component(
     call: &Call,
     log: &Log,
-    _tx: &TransactionTrace,
+    tx: &TransactionTrace,
 ) -> Option<ProtocolComponent> {
     match *call.address {
         // EulerSwap Factory address
-        hex!("79d3a7a9d203d352a655255BdB1a233623f536B7") => {
+        hex!("a4891c18f036f14d7975b0869d77ea7c7032e0ff") => {
             // Try to decode the DeployPool call (not used for now)
             let _deploy_call =
                 crate::abi::eulerswap_factory::functions::DeployPool::match_and_decode(call)?;
@@ -39,15 +39,44 @@ pub fn maybe_create_component(
             let pool_deployed =
                 crate::abi::eulerswap_factory::events::PoolDeployed::match_and_decode(log)?;
 
-            // Format reserves for attributes
-            let reserves = vec![pool_deployed.reserve0.clone(), pool_deployed.reserve1.clone()];
+            // Find the matching PoolConfig event
+            let pool_config_log = tx
+                .logs_with_calls()
+                .find(|(l, _c)| {
+                    let pc= crate::abi::eulerswap_factory::events::PoolConfig::match_and_decode(l);
+                    pc.is_some() && pc.unwrap().pool == pool_deployed.pool
+                }).unwrap().0;
 
+            let pool_config =
+                crate::abi::eulerswap_factory::events::PoolConfig::match_and_decode(pool_config_log)?;
+
+            // Format reserves for attributes
+            let reserves = vec![pool_config.initial_state.0.clone(), pool_config.initial_state.1.clone()];
+
+            // Decode pool params
+            // struct Params {
+            //     // Entities
+            // 0    address vault0;
+            // 1    address vault1;
+            // 2    address eulerAccount;
+            //     // Curve
+            // 3    uint112 equilibriumReserve0;
+            // 4    uint112 equilibriumReserve1;
+            // 5    uint256 priceX;
+            // 6    uint256 priceY;
+            // 7    uint256 concentrationX;
+            // 8    uint256 concentrationY;
+            //     // Fees
+            // 9    uint256 fee;
+            // 10   uint256 protocolFee;
+            // 11   address protocolFeeRecipient;
+            // }
             // Format prices
-            let prices = vec![pool_deployed.price_x.clone(), pool_deployed.price_y.clone()];
+            let prices = vec![pool_config.params.5.clone(), pool_config.params.6.clone()];
 
             // Format concentrations
             let concentrations =
-                vec![pool_deployed.concentration_x.clone(), pool_deployed.concentration_y.clone()];
+                vec![pool_config.params.7.clone(), pool_config.params.8.clone()];
 
             // Create a ProtocolComponent with the proper ID
             let mut component = ProtocolComponent::new(&format_pool_id(&pool_deployed.pool));
@@ -61,8 +90,8 @@ pub fn maybe_create_component(
             // Add contracts
             component = component.with_contracts(&[
                 pool_deployed.pool.clone(),   // The deployed pool contract
-                pool_deployed.vault0.clone(), // Vault0 contract
-                pool_deployed.vault1.clone(), // Vault1 contract
+                pool_config.params.0.clone(), // Vault0 contract
+                pool_config.params.1.clone(), // Vault1 contract
                 EVC_ADDRESS.to_vec(),         // EVC address
                 EULERSWAP_PERIPHERY.to_vec(), // EulerSwap periphery address
                 EVK_GENERIC_FACTORY.to_vec(), // EVK Generic factory address
@@ -73,10 +102,24 @@ pub fn maybe_create_component(
                 ("pool_type", "EulerSwap".as_bytes()),
                 ("euler_account", &pool_deployed.euler_account),
                 (
-                    "fee_multiplier",
-                    &pool_deployed
-                        .fee_multiplier
+                    "fee",
+                    &pool_config
+                        .params
+                        .9
                         .to_signed_bytes_be(),
+                ),
+                (
+                    "protocolFee",
+                    &pool_config
+                        .params
+                        .10
+                        .to_signed_bytes_be(),
+                ),
+                (
+                    "protocolFeeRecipient",
+                    &pool_config
+                        .params
+                        .11,
                 ),
                 ("reserves", &json_serialize_bigint_list(&reserves)),
                 ("prices", &json_serialize_bigint_list(&prices)),
