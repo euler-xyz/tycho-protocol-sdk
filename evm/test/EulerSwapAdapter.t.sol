@@ -38,7 +38,7 @@ contract EulerSwapAdapterTest is AdapterTest {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        address swapper = pool.eulerAccount();
+        address swapper = pool.getParams().eulerAccount;
         uint256 amountIn = 5e6;
         uint256 usdcBalanceBefore = IERC20(USDC).balanceOf(swapper);
         uint256 usdtBalanceBefore = IERC20(USDT).balanceOf(swapper);

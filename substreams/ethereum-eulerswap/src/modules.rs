@@ -29,7 +29,8 @@ use tycho_substreams::{
 };
 
 pub const EVC_ADDRESS: &[u8] = &hex!("0C9a3dd6b8F28529d72d7f9cE918D493519EE383");
-pub const EULERSWAP_PERIPHERY: &[u8] = &hex!("F1a318E9EA46bFcf8942ECD32c6969b5249A81B3");
+pub const EULERSWAP_PERIPHERY: &[u8] = &hex!("bc1b9f90b9d1de7ba9012e3b1ebc846aa510ca31");
+pub const EULERSWAP_IMPLEMENTATION: &[u8] = &hex!("ba4003cf4f0f0248b5195bc004782ce0481eed17");
 pub const EVK_EVAULT_IMPL: &[u8] = &hex!("8ff1c814719096b61abf00bb46ead0c9a529dd7d");
 pub const EVK_VAULT_MODULE_IMPL: &[u8] = &hex!("b4ad4d9c02c01b01cf586c16f01c58c73c7f0188");
 pub const EVK_BORROWING_MODULE_IMPL: &[u8] = &hex!("639156f8feb0cd88205e4861a0224ec169605acf");
@@ -353,30 +354,44 @@ fn map_relative_component_balance(
                     let asset0_bytes = deploy_event.asset0.clone();
                     let asset1_bytes = deploy_event.asset1.clone();
 
-                    // Add reserve0 as the initial balance for asset0
-                    if deploy_event.reserve0 > substreams::scalar::BigInt::from(0) {
-                        deltas.push(BalanceDelta {
-                            ord: log.ordinal(),
-                            tx: Some(log.receipt.transaction.into()),
-                            token: asset0_bytes.clone(),
-                            component_id: pool_id.clone().into_bytes(),
-                            delta: deploy_event
-                                .reserve0
-                                .to_signed_bytes_be(),
-                        });
-                    }
+                                // Find the matching PoolConfig event
+                    let pool_config_log = block
+                        .logs()
+                        .find(|l| {
+                            let pc= crate::abi::eulerswap_factory::events::PoolConfig::match_and_decode(l);
+                            pc.is_some() && pc.unwrap().pool == deploy_event.pool
+                        }).unwrap();
 
-                    // Add reserve1 as the initial balance for asset1
-                    if deploy_event.reserve1 > substreams::scalar::BigInt::from(0) {
-                        deltas.push(BalanceDelta {
-                            ord: log.ordinal(),
-                            tx: Some(log.receipt.transaction.into()),
-                            token: asset1_bytes.clone(),
-                            component_id: pool_id.clone().into_bytes(),
-                            delta: deploy_event
-                                .reserve1
-                                .to_signed_bytes_be(),
-                        });
+                    if let Some(pool_config) =
+                        crate::abi::eulerswap_factory::events::PoolConfig::match_and_decode(pool_config_log)
+                    {
+                        // Add reserve0 as the initial balance for asset0
+                        if pool_config.initial_state.0 > substreams::scalar::BigInt::from(0) {
+                            deltas.push(BalanceDelta {
+                                ord: log.ordinal(),
+                                tx: Some(log.receipt.transaction.into()),
+                                token: asset0_bytes.clone(),
+                                component_id: pool_id.clone().into_bytes(),
+                                delta: pool_config
+                                    .initial_state
+                                    .0
+                                    .to_signed_bytes_be(),
+                            });
+                        }
+
+                        // Add reserve1 as the initial balance for asset1
+                        if pool_config.initial_state.1 > substreams::scalar::BigInt::from(0) {
+                            deltas.push(BalanceDelta {
+                                ord: log.ordinal(),
+                                tx: Some(log.receipt.transaction.into()),
+                                token: asset1_bytes.clone(),
+                                component_id: pool_id.clone().into_bytes(),
+                                delta: pool_config
+                                    .initial_state
+                                    .1
+                                    .to_signed_bytes_be(),
+                            });
+                        }
                     }
                 }
             }
@@ -530,6 +545,11 @@ fn map_protocol_changes(
             value: address_to_bytes_with_0x(PERMIT_2),
             change: ChangeType::Creation.into(),
         },
+        Attribute {
+            name: "stateless_contract_addr_5".to_string(),
+            value: address_to_bytes_with_0x(EULERSWAP_IMPLEMENTATION),
+            change: ChangeType::Creation.into(),
+        },
     ];
 
     // Aggregate newly created components per tx
@@ -604,6 +624,7 @@ fn map_protocol_changes(
             // Check if this address is one of the known fixed addresses
             let is_known_fixed_address = addr.eq(EVC_ADDRESS)
                 || addr.eq(EULERSWAP_PERIPHERY)
+                || addr.eq(EULERSWAP_IMPLEMENTATION)
                 || addr.eq(EVK_EVAULT_IMPL)
                 || addr.eq(EVK_VAULT_MODULE_IMPL)
                 || addr.eq(EVK_BORROWING_MODULE_IMPL)

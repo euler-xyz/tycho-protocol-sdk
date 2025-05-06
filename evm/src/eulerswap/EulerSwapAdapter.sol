@@ -51,7 +51,8 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) external returns (Trade memory trade) {
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        bool isAmountOutAsset0 = buyToken == pool.asset0();
+        (address asset0,) = pool.getAssets();
+        bool isAmountOutAsset0 = buyToken == asset0;
         uint256 amountIn;
         uint256 amountOut;
         if (side == OrderSide.Buy) {
@@ -127,8 +128,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     {
         tokens = new address[](2);
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        tokens[0] = address(pool.asset0());
-        tokens[1] = address(pool.asset1());
+        (tokens[0], tokens[1]) = pool.getAssets();
     }
 
     /// @inheritdoc ISwapAdapter
@@ -138,13 +138,14 @@ contract EulerSwapAdapter is ISwapAdapter {
         override
         returns (bytes32[] memory ids)
     {
+        address[] memory allPools = factory.pools();
         uint256 endIdx = offset + limit;
-        if (endIdx > factory.allPoolsLength()) {
-            endIdx = factory.allPoolsLength();
+        if (endIdx > allPools.length) {
+            endIdx = allPools.length;
         }
         ids = new bytes32[](endIdx - offset);
         for (uint256 i = 0; i < ids.length; i++) {
-            ids[i] = bytes20(factory.allPools(offset + i));
+            ids[i] = bytes20(allPools[offset + i]);
         }
     }
 
