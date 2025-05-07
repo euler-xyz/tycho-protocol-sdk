@@ -8,7 +8,7 @@ This substream is used to extract data from the EulerSwap protocol.
 
 ```bash
 cd ../../evm/
-./scripts/buildRuntime.sh -c "EulerSwapAdapter" -s "constructor(address,address)" -a "0xa4891c18f036f14d7975b0869d77ea7c7032e0ff,0xbc1b9f90b9d1de7ba9012e3b1ebc846aa510ca31"
+./scripts/buildRuntime.sh -c "EulerSwapAdapter" -s "constructor(address,address)" -a "0xa4891c18f036f14d7975b0869d77ea7c7032e0ff,0xb653fb145B2EC8412E74eaB1a48756c54B083A0E"
 
 ```
 

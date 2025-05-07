@@ -51,8 +51,6 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) external returns (Trade memory trade) {
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        (address asset0,) = pool.getAssets();
-        bool isAmountOutAsset0 = buyToken == asset0;
         uint256 amountIn;
         uint256 amountOut;
         if (side == OrderSide.Buy) {
@@ -220,8 +218,10 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.reserve0 = reserve0;
             cache.reserve1 = reserve1;
 
-            address token0 = IEVault(IEulerSwap(pool).vault0()).asset();
-            address token1 = IEVault(IEulerSwap(pool).vault1()).asset();
+            IEulerSwap.Params memory p = IEulerSwap(pool).getParams();
+
+            address token0 = IEVault(p.vault0).asset();
+            address token1 = IEVault(p.vault1).asset();
 
             cache.token0 = token0;
 
@@ -233,7 +233,7 @@ contract EulerSwapAdapter is ISwapAdapter {
 
             cache.initialized = true;
         }
-        
+
         return cache;
     }
 
