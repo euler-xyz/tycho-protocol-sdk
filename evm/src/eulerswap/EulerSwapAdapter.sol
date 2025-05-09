@@ -11,6 +11,8 @@ import {
     IERC20,
     SafeERC20
 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+
 
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
@@ -34,7 +36,7 @@ contract EulerSwapAdapter is ISwapAdapter {
         bool initialized;
     }
 
-    mapping(address eulerSwap => PoolCache) pools;
+    mapping(address eulerSwap => PoolCache) internal pools;
 
     constructor(address factory_, address periphery_) {
         factory = IEulerSwapFactory(factory_);
@@ -67,10 +69,8 @@ contract EulerSwapAdapter is ISwapAdapter {
             );
         }
 
-        IERC20(sellToken).safeTransferFrom(msg.sender, address(pool), amountIn);
-
         trade.gasUsed = 300000; //TODO set correct
-        trade.price = Fraction(0, 1);
+        trade.price = Fraction(0, 0);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -160,7 +160,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         capabilities[2] = Capability.TokenBalanceIndependent;
     }
 
-    /// @notice Calculates pool prices for specified amounts
     function quoteExactInput(
         IEulerSwap pool,
         address tokenIn,
@@ -182,6 +181,11 @@ contract EulerSwapAdapter is ISwapAdapter {
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
 
         calculatedPrice = Fraction(amountOut, amountIn);
+    }
+
+    /// @dev for testing only
+    function getPoolCache(address pool) public view returns (PoolCache memory) {
+        return pools[pool];
     }
 
     function quoteExactOutput(
@@ -211,30 +215,37 @@ contract EulerSwapAdapter is ISwapAdapter {
         PoolCache storage cache = pools[pool];
 
         if (!cache.initialized) {
-            (uint112 reserve0, uint112 reserve1, uint32 status) =
-                IEulerSwap(pool).getReserves();
-            if (status != POOL_STATUS_UNLOCKED) revert("Invalid pool state");
-
-            cache.reserve0 = reserve0;
-            cache.reserve1 = reserve1;
-
-            IEulerSwap.Params memory p = IEulerSwap(pool).getParams();
-
-            address token0 = IEVault(p.vault0).asset();
-            address token1 = IEVault(p.vault1).asset();
-
-            cache.token0 = token0;
-
-            (uint256 limitIn, uint256 limitOut) =
-                periphery.getLimits(pool, token0, token1);
-            cache.limit0to1 = Limit(limitIn, limitOut);
-            (limitIn, limitOut) = periphery.getLimits(pool, token1, token0);
-            cache.limit1to0 = Limit(limitIn, limitOut);
-
-            cache.initialized = true;
+            initializeCache(pool);
         }
 
         return cache;
+    }
+
+    /// @dev Function is public for testing
+    function initializeCache(address pool) public {
+        PoolCache storage cache = pools[pool];
+
+        (uint112 reserve0, uint112 reserve1, uint32 status) =
+            IEulerSwap(pool).getReserves();
+        if (status != POOL_STATUS_UNLOCKED) revert("Invalid pool state");
+
+        cache.reserve0 = reserve0;
+        cache.reserve1 = reserve1;
+
+        IEulerSwap.Params memory p = IEulerSwap(pool).getParams();
+
+        address token0 = IERC4626(p.vault0).asset();
+        address token1 = IERC4626(p.vault1).asset();
+
+        cache.token0 = token0;
+
+        (uint256 limitIn, uint256 limitOut) =
+            periphery.getLimits(pool, token0, token1);
+        cache.limit0to1 = Limit(limitIn, limitOut);
+        (limitIn, limitOut) = periphery.getLimits(pool, token1, token0);
+        cache.limit1to0 = Limit(limitIn, limitOut);
+
+        cache.initialized = true;
     }
 
     function updatePoolCache(
@@ -259,7 +270,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         uint256 newReserve0 = cache.reserve0 + amount0In - amount0Out;
         uint256 newReserve1 = cache.reserve1 + amount1In - amount1Out;
 
-
         cache.reserve0 = uint112(newReserve0);
         cache.reserve1 = uint112(newReserve1);
 
@@ -279,8 +289,4 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.limit0to1.limitOut += amountIn;
         }
     }
-}
-
-interface IEVault {
-    function asset() external view returns (address);
 }
