@@ -17,6 +17,8 @@ import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
 
+    uint256 constant SWAP_GAS_COST = 750000;
+
     IEulerSwapFactory immutable factory;
     IEulerSwapPeriphery immutable periphery;
 
@@ -69,8 +71,8 @@ contract EulerSwapAdapter is ISwapAdapter {
             );
         }
 
-        trade.gasUsed = 300000; //TODO set correct
-        trade.price = Fraction(0, 0);
+        trade.gasUsed = SWAP_GAS_COST;
+        trade.price = Fraction(0, 1);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -83,15 +85,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         revert ISwapAdapterTypes.NotImplemented(
             "Price function not implemented"
         );
-
-        // prices = new Fraction[](specifiedAmounts.length);
-
-        // IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        // for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-        //     prices[i] =
-        //         quoteExactInput(pool, sellToken, buyToken,
-        // specifiedAmounts[i]);
-        // }
     }
 
     /// @inheritdoc ISwapAdapter

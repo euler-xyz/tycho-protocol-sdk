@@ -46,16 +46,14 @@ contract EulerSwapAdapterTest is AdapterTest {
         deal(USDC, swapper, 10e6);
 
         uint256 amountIn = 5e6;
-        uint256 usdcBalanceBefore = IERC20(USDC).balanceOf(swapper);
-        uint256 usdtBalanceBefore = IERC20(USDT).balanceOf(swapper);
 
         vm.startPrank(swapper);
         IERC20(USDC).approve(address(adapter), amountIn);
-        adapter.swap(poolId, USDC, USDT, OrderSide.Sell, amountIn);
+        Trade memory trade = adapter.swap(poolId, USDC, USDT, OrderSide.Sell, amountIn);
         vm.stopPrank();
-        // TODO
-        // assertGt(IERC20(USDT).balanceOf(address(swapper)), usdtBalanceBefore);
-        // assertLt(IERC20(USDC).balanceOf(address(swapper)), usdcBalanceBefore);
+
+        assertEq(trade.calculatedAmount, 5e6);
+        assertEq(trade.gasUsed, 750000);
     }
 
     function testEulerSwap_Price() public {
@@ -168,16 +166,16 @@ contract EulerSwapAdapterInvariants is Test {
         EulerSwapAdapter.PoolCache memory cache = adapter.getPoolCache(USDC_USDT_POOL);
         
         (uint112 reserve0, uint112 reserve1,) = IEulerSwap(USDC_USDT_POOL).getReserves();
-        assertApproxEqAbs(reserve0, cache.reserve0, 5);
-        assertApproxEqAbs(reserve1, cache.reserve1, 5);
+        assertApproxEqAbs(reserve0, cache.reserve0, 1);
+        assertApproxEqAbs(reserve1, cache.reserve1, 1);
 
         (uint256 limit0, uint256 limit1) = IEulerSwap(USDC_USDT_POOL).getLimits(asset0, asset1);
-        assertApproxEqAbs(cache.limit0to1.limitIn, limit0, 5);
-        assertApproxEqAbs(cache.limit0to1.limitOut, limit1, 5);
+        assertApproxEqAbs(cache.limit0to1.limitIn, limit0, 1);
+        assertApproxEqAbs(cache.limit0to1.limitOut, limit1, 1);
 
         (limit0, limit1) = IEulerSwap(USDC_USDT_POOL).getLimits(asset1, asset0);
-        assertApproxEqAbs(cache.limit1to0.limitIn, limit0, 5);
-        assertApproxEqAbs(cache.limit1to0.limitOut, limit1, 5);
+        assertApproxEqAbs(cache.limit1to0.limitIn, limit0, 1);
+        assertApproxEqAbs(cache.limit1to0.limitOut, limit1, 1);
     }
 }
 
@@ -208,14 +206,14 @@ contract EulerSwapAdapterHandler is Test {
     }
 
     function swap(ISwapAdapter.OrderSide side, bool isAsset0In, uint256 amount) public {
+        // 1 wei amounts will hit zero shares error on deposit, ignore
+        if (amount <= 1) return;
+
         (address assetIn, address assetOut) = isAsset0In ? (asset0, asset1) : (asset1, asset0);
         (uint256 limitIn, uint256 limitOut) = pool.getLimits(assetIn, assetOut);
 
         if (side == ISwapAdapterTypes.OrderSide.Sell && amount > limitIn) return; 
         if (side == ISwapAdapterTypes.OrderSide.Buy && amount > limitOut) return; 
-
-        // TODO
-        if (amount < 5) return;
 
         // quote swap through the adapter, remembering the results
         adapter.swap(poolId, assetIn, assetOut, side, amount);
