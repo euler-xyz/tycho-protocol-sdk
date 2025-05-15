@@ -14,14 +14,14 @@ import {IERC4626} from
     "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import "forge-std/Test.sol";
 
-address constant EULER_SWAP_FACTORY = 0xa4891c18f036F14d7975b0869D77eA7c7032e0fF;
+address constant EULER_SWAP_FACTORY = 0xAe27c4Cb02C73F5594430302d44D6634A0d52d2e;
 address constant EULER_SWAP_PERIPHERY =
-    0xb653fb145B2EC8412E74eaB1a48756c54B083A0E;
+    0x4fE0547e7Be0e9a9cED3aC948B83146996f899aE;
 address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-address constant USDC_USDT_POOL = 0x93839Ae283b2A827210586DEbA7b1dE50A122888;
+address constant USDC_USDT_POOL = 0x25bC4611b68050Ea69D5C2D73F08f9742B8e68A8;
 
-uint256 constant FORK_BLOCK = 22431196;
+uint256 constant FORK_BLOCK = 22488346;
 
 contract EulerSwapAdapterTest is AdapterTest {
     using FractionMath for Fraction;

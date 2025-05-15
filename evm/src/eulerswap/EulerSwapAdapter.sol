@@ -57,6 +57,7 @@ contract EulerSwapAdapter is ISwapAdapter {
 
         uint256 amountIn;
         uint256 amountOut;
+
         if (side == OrderSide.Buy) {
             amountIn = (
                 quoteExactOutput(pool, sellToken, buyToken, specifiedAmount)
@@ -164,13 +165,17 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
+        (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
+
         uint256 amountOut = periphery.quoteExactInputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
             amountIn,
             cache.reserve0,
-            cache.reserve1
+            cache.reserve1,
+            limitIn,
+            limitOut
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
@@ -195,13 +200,17 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
+        (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
+
         uint256 amountIn = periphery.quoteExactOutputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
             amountOut,
             cache.reserve0,
-            cache.reserve1
+            cache.reserve1,
+            limitIn,
+            limitOut
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
@@ -298,5 +307,15 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.limit0to1.limitIn += amountOut;
             cache.limit0to1.limitOut += amountIn;
         }
+    }
+
+    function getCachedLimits(PoolCache storage cache, address tokenIn)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        return cache.token0 == tokenIn
+            ? (cache.limit0to1.limitIn, cache.limit0to1.limitOut)
+            : (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
     }
 }

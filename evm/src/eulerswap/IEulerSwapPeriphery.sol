@@ -58,7 +58,9 @@ interface IEulerSwapPeriphery {
         address tokenOut,
         uint256 amountIn,
         uint112 reserve0,
-        uint112 reserve1
+        uint112 reserve1,
+        uint256 limitIn,
+        uint256 limitOut
     ) external returns (uint256);
 
     /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`?
@@ -69,7 +71,9 @@ interface IEulerSwapPeriphery {
         address tokenOut,
         uint256 amountOut,
         uint112 reserve0,
-        uint112 reserve1
+        uint112 reserve1,
+        uint256 limitIn,
+        uint256 limitOut
     ) external returns (uint256);
 
     /// @notice Upper-bound on the max amount that can be sold of tokenIn and
