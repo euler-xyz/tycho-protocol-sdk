@@ -11,8 +11,11 @@ import {
     IERC20,
     SafeERC20
 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
+
+import "forge-std/Test.sol";
 
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
@@ -75,23 +78,20 @@ contract EulerSwapAdapter is ISwapAdapter {
 
     /// @inheritdoc ISwapAdapter
     function price(
-        bytes32, /*poolId*/
-        address, /*sellToken*/
-        address, /*buyToken*/
-        uint256[] memory /*specifiedAmounts*/
-    ) external pure override returns (Fraction[] memory) {
-        revert ISwapAdapterTypes.NotImplemented(
-            "Price function not implemented"
-        );
+        bytes32 poolId,
+        address sellToken,
+        address /*buyToken*/,
+        uint256[] memory specifiedAmounts
+    ) external view override returns (Fraction[] memory prices) {
 
-        // prices = new Fraction[](specifiedAmounts.length);
+        prices = new Fraction[](specifiedAmounts.length);
 
-        // IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
-        // for (uint256 i = 0; i < specifiedAmounts.length; i++) {
-        //     prices[i] =
-        //         quoteExactInput(pool, sellToken, buyToken,
-        // specifiedAmounts[i]);
-        // }
+        IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
+        for (uint256 i = 0; i < specifiedAmounts.length; i++) {
+            uint256 marginalPrice = calculateMarginalPrice(pool, sellToken, specifiedAmounts[i]);
+
+            prices[i] = Fraction(marginalPrice, 1e18);
+        }
     }
 
     /// @inheritdoc ISwapAdapter
@@ -154,10 +154,11 @@ contract EulerSwapAdapter is ISwapAdapter {
         override
         returns (Capability[] memory capabilities)
     {
-        capabilities = new Capability[](3);
+        capabilities = new Capability[](4);
         capabilities[0] = Capability.SellOrder;
         capabilities[1] = Capability.BuyOrder;
         capabilities[2] = Capability.TokenBalanceIndependent;
+        capabilities[3] = Capability.MarginalPrice;
     }
 
     function quoteExactInput(
@@ -288,5 +289,63 @@ contract EulerSwapAdapter is ISwapAdapter {
             cache.limit0to1.limitIn += amountOut;
             cache.limit0to1.limitOut += amountIn;
         }
+    }
+
+    /// @dev Calculate marginal price after swapping `amount` if `sellToken`
+    function calculateMarginalPrice(IEulerSwap pool, address sellToken, uint256 amount) internal view returns (uint256) {
+        IEulerSwap.Params memory p = pool.getParams();
+        uint256 px = p.priceX;
+        uint256 py = p.priceY;
+        uint256 x0 = p.equilibriumReserve0;
+        uint256 y0 = p.equilibriumReserve1;
+        uint256 cx = p.concentrationX;
+        uint256 cy = p.concentrationY;
+
+        (uint112 reserve0, uint112 reserve1,) = pool.getReserves();
+        console2.log('x0: ', x0);
+        console2.log('reserve0: ', reserve0);
+        console2.log('reserve1: ', reserve1);
+
+        bool asset0IsInput = IERC4626(p.vault0).asset() == sellToken;
+
+        console.log('asset0IsInput: ', asset0IsInput);
+        uint256 xNew;
+        uint256 yNew;
+        int256 result;
+        if (asset0IsInput) {
+            // swap X in and Y out
+            xNew = reserve0 + amount;
+            if (xNew <= x0) {
+                console.log('remain');
+                // remain on f()
+                result = df_dx(xNew, px, py, x0, cx);
+            } else {
+                console.log('not remain');
+                // move to g()
+                result = 1e18 * 1e18 / df_dx(xNew, py, px, y0, cy);
+            }
+        } else {
+            // swap Y in and X out
+            yNew = reserve1 + amount;
+            if (yNew <= y0) {
+                // remain on g()
+                result = df_dx(yNew, py, px, y0, cy);
+            } else {
+                // move to f()
+                result = 1e18 * 1e18 / df_dx(yNew, px, py, x0, cx);
+            }
+        }
+        // require(price > 0, "Negative price");
+        console2.log('result: ', result);
+        if (result < 0) result *= -1;
+        return uint256(result);
+    }
+
+    // https://en.wikipedia.org/wiki/Inverse_function_theorem
+    /// @dev EulerSwap derivative helper function to find the price after a swap
+    /// Pre-conditions: 0 < x <= x0 <= type(uint112).max, 1 <= {px,py} <= 1e36, c <= 1e18
+    function df_dx(uint256 x, uint256 px, uint256 py, uint256 x0, uint256 c) internal pure returns (int256) {
+        uint256 r = Math.mulDiv(x0 * x0 / x, 1e18, x, Math.Rounding.Ceil);
+        return -int256(px * (c + (1e18 - c) * r / 1e18) / py);
     }
 }
