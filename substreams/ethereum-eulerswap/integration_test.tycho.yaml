@@ -16,13 +16,13 @@ skip_balance_check: true
 # This will be applied to each test.
 initialized_accounts:
   - "0x0c9a3dd6b8f28529d72d7f9ce918d493519ee383" # This is the EVC address
-  - "0xba4003cf4f0f0248b5195bc004782ce0481eed17" # EulerSwap implementation
+  # - "0xba4003cf4f0f0248b5195bc004782ce0481eed17" # EulerSwap implementation
   - "0xb653fb145B2EC8412E74eaB1a48756c54B083A0E" # EulerSwapPerihpery
   - "0x29a56a1b8214d9cf7c5561811750d5cbdb45cc8e" # EVK: GenericFactory contract
-  - "0x8ff1c814719096b61abf00bb46ead0c9a529dd7d" # EVK: EVault implementation
-  - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
-  - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
-  - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
+  # - "0x8ff1c814719096b61abf00bb46ead0c9a529dd7d" # EVK: EVault implementation
+  # - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
+  # - "0x639156f8feb0cd88205e4861a0224ec169605acf" # EVK: Borrowing module implementation
+  # - "0xa61f5016f2cd5cec12d091f871fce1e1df5f0b67" # EVK: Governance module implementation
   # - "0xb896f28969a04202564e4eaa494a7253e0e6f3dc" # IRMLinearKink
   # - "0x1a34934a091fb8c030468bdf99d695fa3264ee30" # vault-0/1 dToken
   # - "0x36f8c4b4c6a638bb38f49285c08e282c99db05fb" # EulerRouter
