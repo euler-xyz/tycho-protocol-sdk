@@ -11,8 +11,8 @@ import {
     IERC20,
     SafeERC20
 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC4626} from "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-
+import {IERC4626} from
+    "openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
@@ -101,12 +101,15 @@ contract EulerSwapAdapter is ISwapAdapter {
 
         if (cache.initialized) {
             if (cache.token0 == sellToken) {
-                (limits[0], limits[1]) = (cache.limit0to1.limitIn, cache.limit0to1.limitOut);
+                (limits[0], limits[1]) =
+                    (cache.limit0to1.limitIn, cache.limit0to1.limitOut);
             } else {
-                (limits[0], limits[1]) = (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
+                (limits[0], limits[1]) =
+                    (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
             }
         } else {
-            (limits[0], limits[1]) = periphery.getLimits(pool, sellToken, buyToken);
+            (limits[0], limits[1]) =
+                periphery.getLimits(pool, sellToken, buyToken);
         }
     }
 
@@ -161,8 +164,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        uint256 amountOut =
-        periphery.quoteExactInputWithReserves(
+        uint256 amountOut = periphery.quoteExactInputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
@@ -177,7 +179,11 @@ contract EulerSwapAdapter is ISwapAdapter {
     }
 
     /// @dev for testing only
-    function getPoolCache(address pool) public view returns (PoolCache memory) {
+    function getPoolCache(address pool)
+        public
+        view
+        returns (PoolCache memory)
+    {
         return pools[pool];
     }
 
@@ -189,8 +195,7 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) internal returns (Fraction memory calculatedPrice) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        uint256 amountIn = periphery
-            .quoteExactOutputWithReserves(
+        uint256 amountIn = periphery.quoteExactOutputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
@@ -267,15 +272,27 @@ contract EulerSwapAdapter is ISwapAdapter {
         cache.reserve1 = uint112(newReserve1);
 
         if (cache.token0 == tokenIn) {
-            require(cache.limit0to1.limitIn > amountIn, LimitExceeded(cache.limit0to1.limitIn));
-            require(cache.limit0to1.limitOut > amountOut, LimitExceeded(cache.limit0to1.limitOut));
+            require(
+                cache.limit0to1.limitIn > amountIn,
+                LimitExceeded(cache.limit0to1.limitIn)
+            );
+            require(
+                cache.limit0to1.limitOut > amountOut,
+                LimitExceeded(cache.limit0to1.limitOut)
+            );
             cache.limit0to1.limitIn -= amountIn;
             cache.limit0to1.limitOut -= amountOut;
             cache.limit1to0.limitIn += amountOut;
             cache.limit1to0.limitOut += amountIn;
         } else {
-            require(cache.limit1to0.limitIn > amountIn, LimitExceeded(cache.limit1to0.limitIn));
-            require(cache.limit1to0.limitOut > amountOut, LimitExceeded(cache.limit1to0.limitOut));
+            require(
+                cache.limit1to0.limitIn > amountIn,
+                LimitExceeded(cache.limit1to0.limitIn)
+            );
+            require(
+                cache.limit1to0.limitOut > amountOut,
+                LimitExceeded(cache.limit1to0.limitOut)
+            );
             cache.limit1to0.limitIn -= amountIn;
             cache.limit1to0.limitOut -= amountOut;
             cache.limit0to1.limitIn += amountOut;

@@ -2,9 +2,12 @@
 pragma solidity >=0.8.0;
 
 interface IEulerSwapPeriphery {
-    /// @notice Swap `amountIn` of `tokenIn` for `tokenOut`, with at least `amountOutMin` received.
-    /// Output tokens are sent to `receiver`. The swap will fail after `deadline` (unless `deadline` is 0).
-    /// IMPORTANT: `eulerSwap` must be a trusted contract, for example created by a trusted factory.
+    /// @notice Swap `amountIn` of `tokenIn` for `tokenOut`, with at least
+    /// `amountOutMin` received.
+    /// Output tokens are sent to `receiver`. The swap will fail after
+    /// `deadline` (unless `deadline` is 0).
+    /// IMPORTANT: `eulerSwap` must be a trusted contract, for example created
+    /// by a trusted factory.
     function swapExactIn(
         address eulerSwap,
         address tokenIn,
@@ -15,9 +18,12 @@ interface IEulerSwapPeriphery {
         uint256 deadline
     ) external;
 
-    /// @notice Swap `amountOut` of `tokenOut` for `tokenIn`, with at most `amountInMax` paid.
-    /// Output tokens are sent to `receiver`. The swap will fail after `deadline` (unless `deadline` is 0).
-    /// IMPORTANT: `eulerSwap` must be a trusted contract, for example created by a trusted factory.
+    /// @notice Swap `amountOut` of `tokenOut` for `tokenIn`, with at most
+    /// `amountInMax` paid.
+    /// Output tokens are sent to `receiver`. The swap will fail after
+    /// `deadline` (unless `deadline` is 0).
+    /// IMPORTANT: `eulerSwap` must be a trusted contract, for example created
+    /// by a trusted factory.
     function swapExactOut(
         address eulerSwap,
         address tokenIn,
@@ -44,7 +50,8 @@ interface IEulerSwapPeriphery {
         uint256 amountOut
     ) external view returns (uint256);
 
-    /// @notice How much `tokenOut` can I get for `amountIn` of `tokenIn`? Starting with provided reserves.
+    /// @notice How much `tokenOut` can I get for `amountIn` of `tokenIn`?
+    /// Starting with provided reserves.
     function quoteExactInputWithReserves(
         address eulerSwap,
         address tokenIn,
@@ -54,7 +61,8 @@ interface IEulerSwapPeriphery {
         uint112 reserve1
     ) external returns (uint256);
 
-    /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`? Starting with provided reserves.
+    /// @notice How much `tokenIn` do I need to get `amountOut` of `tokenOut`?
+    /// Starting with provided reserves.
     function quoteExactOutputWithReserves(
         address eulerSwap,
         address tokenIn,
@@ -64,6 +72,10 @@ interface IEulerSwapPeriphery {
         uint112 reserve1
     ) external returns (uint256);
 
-    /// @notice Upper-bound on the max amount that can be sold of tokenIn and bought of tokenOut
-    function getLimits(address eulerSwap, address tokenIn, address tokenOut) external view returns (uint256, uint256);
+    /// @notice Upper-bound on the max amount that can be sold of tokenIn and
+    /// bought of tokenOut
+    function getLimits(address eulerSwap, address tokenIn, address tokenOut)
+        external
+        view
+        returns (uint256, uint256);
 }
