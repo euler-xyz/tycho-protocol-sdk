@@ -5,7 +5,7 @@ adapter_contract: "EulerSwapAdapter"
 # Constructor signature of the Adapter contract"
 adapter_build_signature: "constructor(address,address)"
 # A comma separated list of args to be passed to the contructor of the Adapter contract"
-adapter_build_args: "0xa4891c18f036f14d7975b0869d77ea7c7032e0ff,0xb653fb145B2EC8412E74eaB1a48756c54B083A0E"
+adapter_build_args: "0xef443ff309e489e9ae2b17f932bdf2184dfa7748,0xa0151e27253a4a1e78a45a122d7be90c7a43e1f3"
 # Whether or not the testing script should skip checking balances of the protocol components.
 # If set to `true` please always add a reason why it's skipped.
 skip_balance_check: true
@@ -16,8 +16,8 @@ skip_balance_check: true
 # This will be applied to each test.
 initialized_accounts:
   - "0x0c9a3dd6b8f28529d72d7f9ce918d493519ee383" # This is the EVC address
-  # - "0xba4003cf4f0f0248b5195bc004782ce0481eed17" # EulerSwap implementation
-  - "0xb653fb145B2EC8412E74eaB1a48756c54B083A0E" # EulerSwapPerihpery
+  - "0x22c4f99147d9c18254159dbf31f55cc5bd5685c9" # EulerSwap implementation
+  - "0xa0151e27253a4a1e78a45a122d7be90c7a43e1f3" # EulerSwapPerihpery
   - "0x29a56a1b8214d9cf7c5561811750d5cbdb45cc8e" # EVK: GenericFactory contract
   # - "0x8ff1c814719096b61abf00bb46ead0c9a529dd7d" # EVK: EVault implementation
   # - "0xb4ad4d9c02c01b01cf586c16f01c58c73c7f0188" # EVK: Vault module implementation
@@ -40,21 +40,21 @@ tests:
   # Name of the test
   - name: test_pool_creation
     # Indexed block range
-    start_block: 22388268
-    stop_block: 22431196 #22388480
+    start_block: 22495757
+    stop_block: 22495956 #22388480
     # Same as global `initialized_accounts` but only scoped to this test.
     initialized_accounts:
       - "0xa66957e58b60d6b92b850c8773a9ff9b0ba96a65" # This is the USDC vault in Euler lending protocol that will hold the USDC for the pool
       - "0x4212e01c7c8e1c21dea6030c74ae2084f5337bd1" # This is the USDT vault in Euler lending protocol that will hold the USDT for the pool
     # A list of expected component indexed in the block range. Each component must match perfectly the `ProtocolComponent` indexed by your subtreams module.
     expected_components:
-      - id: "0x93839ae283b2a827210586deba7b1de50a122888"
+      - id: "0xEaA6b017C5217103bCF567826e1928bFDCa328A8"
         tokens:
           - "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
           - "0xdac17f958d2ee523a2206206994597c13d831ec7"
         static_attributes:
           pool_type: "0x45756c657253776170"
-          euler_account: "0x3b64d01ac88d41fd6e5717d82de7b980c1d88727"
+          euler_account: "0xA2883Ec6366f7eD23723891ad141BdEc5E6E4013"
           fee: "0x0"
           protocolFee: "0x0"
           protocolFeeRecipient: "0x0000000000000000000000000000000000000000"
