@@ -58,11 +58,11 @@ tests:
           fee: "0x0"
           protocolFee: "0x0"
           protocolFeeRecipient: "0x0000000000000000000000000000000000000000"
-          reserves: "0x5b2230783362396163613030222c2230783362396163613030225d"
+          reserves: "0x5b2230783032666166303830222c2230783032666166303830225d"
           prices: "0x5b22307830646530623662336137363430303030222c22307830646530623662336137363430303030225d"
           concentrations: "0x5b22307830643736323164633538323130303030222c22307830643736323164633538323130303030225d"
           manual_updates: "0x01"
-        creation_tx: "0x82c99a8a3a83c547cfd22948470b76bb67b860cfc4aef0d17b374799c629e9fe"
+        creation_tx: "0x6d4ce9de7dc568f5ffdeb428d46083cd720a6b1b41ef1c140459759d8737b6f4"
         # Whether or not the script should skip trying to simulate a swap on this component.
         # If set to `true` please always add a reason why it's skipped.
         skip_simulation: false
