@@ -31,7 +31,7 @@ pub fn maybe_create_component(
 ) -> Option<ProtocolComponent> {
     match *call.address {
         // EulerSwap Factory address
-        hex!("ae27c4cb02c73f5594430302d44d6634a0d52d2e") => {
+        hex!("ef443ff309e489e9ae2b17f932bdf2184dfa7748") => {
             // Try to decode the DeployPool call (not used for now)
             let _deploy_call =
                 crate::abi::eulerswap_factory::functions::DeployPool::match_and_decode(call)?;

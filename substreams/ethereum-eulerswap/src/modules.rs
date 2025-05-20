@@ -29,8 +29,8 @@ use tycho_substreams::{
 };
 
 pub const EVC_ADDRESS: &[u8] = &hex!("0C9a3dd6b8F28529d72d7f9cE918D493519EE383");
-pub const EULERSWAP_PERIPHERY: &[u8] = &hex!("4fE0547e7Be0e9a9cED3aC948B83146996f899aE");
-pub const EULERSWAP_IMPLEMENTATION: &[u8] = &hex!("270e7d14f304c0df91e50996072525b24978e17f");
+pub const EULERSWAP_PERIPHERY: &[u8] = &hex!("a0151e27253a4a1e78a45a122d7be90c7a43e1f3");
+pub const EULERSWAP_IMPLEMENTATION: &[u8] = &hex!("22c4f99147d9c18254159dbf31f55cc5bd5685c9");
 pub const EVK_EVAULT_IMPL: &[u8] = &hex!("8ff1c814719096b61abf00bb46ead0c9a529dd7d");
 pub const EVK_VAULT_MODULE_IMPL: &[u8] = &hex!("b4ad4d9c02c01b01cf586c16f01c58c73c7f0188");
 pub const EVK_BORROWING_MODULE_IMPL: &[u8] = &hex!("639156f8feb0cd88205e4861a0224ec169605acf");
