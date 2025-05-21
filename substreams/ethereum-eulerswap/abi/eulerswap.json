@@ -807,7 +807,6 @@
     "anonymous": false
   },
   { "type": "error", "name": "AlreadyActivated", "inputs": [] },
-  { "type": "error", "name": "AlreadyInitialized", "inputs": [] },
   { "type": "error", "name": "AmountTooBig", "inputs": [] },
   { "type": "error", "name": "AssetsOutOfOrderOrEqual", "inputs": [] },
   { "type": "error", "name": "BadParam", "inputs": [] },
@@ -822,11 +821,7 @@
   { "type": "error", "name": "HookNotImplemented", "inputs": [] },
   { "type": "error", "name": "InsufficientCalldata", "inputs": [] },
   { "type": "error", "name": "Locked", "inputs": [] },
-  {
-    "type": "error",
-    "name": "NativeConcentratedLiquidityUnsupported",
-    "inputs": []
-  },
+  { "type": "error", "name": "LockedHook", "inputs": [] },
   { "type": "error", "name": "NotAuthorized", "inputs": [] },
   { "type": "error", "name": "NotPoolManager", "inputs": [] },
   { "type": "error", "name": "OperatorNotInstalled", "inputs": [] },

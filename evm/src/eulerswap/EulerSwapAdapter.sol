@@ -20,6 +20,8 @@ import "forge-std/Test.sol";
 contract EulerSwapAdapter is ISwapAdapter {
     using SafeERC20 for IERC20;
 
+    uint256 constant SWAP_GAS_COST = 750000;
+
     IEulerSwapFactory immutable factory;
     IEulerSwapPeriphery immutable periphery;
 
@@ -56,24 +58,16 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) external returns (Trade memory trade) {
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        uint256 amountIn;
-        uint256 amountOut;
         if (side == OrderSide.Buy) {
-            amountIn = (
-                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount)
-                    .denominator
-            );
-            trade.calculatedAmount = amountOut = specifiedAmount;
+            trade.calculatedAmount =
+                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount);
         } else {
-            trade.calculatedAmount = amountIn = specifiedAmount;
-            amountOut = (
-                quoteExactInput(pool, sellToken, buyToken, specifiedAmount)
-                    .numerator
-            );
+            trade.calculatedAmount =
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmount);
         }
 
-        trade.gasUsed = 300000; //TODO set correct
-        trade.price = Fraction(0, 0);
+        trade.gasUsed = SWAP_GAS_COST;
+        trade.price = Fraction(0, 1);
     }
 
     /// @inheritdoc ISwapAdapter
@@ -108,12 +102,15 @@ contract EulerSwapAdapter is ISwapAdapter {
 
         if (cache.initialized) {
             if (cache.token0 == sellToken) {
-                (limits[0], limits[1]) = (cache.limit0to1.limitIn, cache.limit0to1.limitOut);
+                (limits[0], limits[1]) =
+                    (cache.limit0to1.limitIn, cache.limit0to1.limitOut);
             } else {
-                (limits[0], limits[1]) = (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
+                (limits[0], limits[1]) =
+                    (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
             }
         } else {
-            (limits[0], limits[1]) = periphery.getLimits(pool, sellToken, buyToken);
+            (limits[0], limits[1]) =
+                periphery.getLimits(pool, sellToken, buyToken);
         }
     }
 
@@ -166,26 +163,31 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountIn
-    ) internal returns (Fraction memory calculatedPrice) {
+    ) internal returns (uint256 amountOut) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        uint256 amountOut =
-        periphery.quoteExactInputWithReserves(
+        (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
+
+        amountOut = periphery.quoteExactInputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
             amountIn,
             cache.reserve0,
-            cache.reserve1
+            cache.reserve1,
+            limitIn,
+            limitOut
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
-
-        calculatedPrice = Fraction(amountOut, amountIn);
     }
 
     /// @dev for testing only
-    function getPoolCache(address pool) public view returns (PoolCache memory) {
+    function getPoolCache(address pool)
+        public
+        view
+        returns (PoolCache memory)
+    {
         return pools[pool];
     }
 
@@ -194,22 +196,23 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountOut
-    ) internal returns (Fraction memory calculatedPrice) {
+    ) internal returns (uint256 amountIn) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
-        uint256 amountIn = periphery
-            .quoteExactOutputWithReserves(
+        (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
+
+        amountIn = periphery.quoteExactOutputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
             amountOut,
             cache.reserve0,
-            cache.reserve1
+            cache.reserve1,
+            limitIn,
+            limitOut
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
-
-        calculatedPrice = Fraction(amountOut, amountIn);
     }
 
     function loadPoolCache(address pool) internal returns (PoolCache storage) {
@@ -268,6 +271,10 @@ contract EulerSwapAdapter is ISwapAdapter {
             amount1In = amountIn;
         }
 
+        // 1 asset deposit would trigger zero shares error
+        if (amount0In == 1) amount0In = 0;
+        if (amount1In == 1) amount1In = 0;
+
         uint256 newReserve0 = cache.reserve0 + amount0In - amount0Out;
         uint256 newReserve1 = cache.reserve1 + amount1In - amount1Out;
 
@@ -275,15 +282,27 @@ contract EulerSwapAdapter is ISwapAdapter {
         cache.reserve1 = uint112(newReserve1);
 
         if (cache.token0 == tokenIn) {
-            require(cache.limit0to1.limitIn > amountIn, LimitExceeded(cache.limit0to1.limitIn));
-            require(cache.limit0to1.limitOut > amountOut, LimitExceeded(cache.limit0to1.limitOut));
+            require(
+                cache.limit0to1.limitIn > amountIn,
+                LimitExceeded(cache.limit0to1.limitIn)
+            );
+            require(
+                cache.limit0to1.limitOut > amountOut,
+                LimitExceeded(cache.limit0to1.limitOut)
+            );
             cache.limit0to1.limitIn -= amountIn;
             cache.limit0to1.limitOut -= amountOut;
             cache.limit1to0.limitIn += amountOut;
             cache.limit1to0.limitOut += amountIn;
         } else {
-            require(cache.limit1to0.limitIn > amountIn, LimitExceeded(cache.limit1to0.limitIn));
-            require(cache.limit1to0.limitOut > amountOut, LimitExceeded(cache.limit1to0.limitOut));
+            require(
+                cache.limit1to0.limitIn > amountIn,
+                LimitExceeded(cache.limit1to0.limitIn)
+            );
+            require(
+                cache.limit1to0.limitOut > amountOut,
+                LimitExceeded(cache.limit1to0.limitOut)
+            );
             cache.limit1to0.limitIn -= amountIn;
             cache.limit1to0.limitOut -= amountOut;
             cache.limit0to1.limitIn += amountOut;
@@ -347,5 +366,15 @@ contract EulerSwapAdapter is ISwapAdapter {
     function df_dx(uint256 x, uint256 px, uint256 py, uint256 x0, uint256 c) internal pure returns (int256) {
         uint256 r = Math.mulDiv(x0 * x0 / x, 1e18, x, Math.Rounding.Ceil);
         return -int256(px * (c + (1e18 - c) * r / 1e18) / py);
+    }
+    
+    function getCachedLimits(PoolCache storage cache, address tokenIn)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        return cache.token0 == tokenIn
+            ? (cache.limit0to1.limitIn, cache.limit0to1.limitOut)
+            : (cache.limit1to0.limitIn, cache.limit1to0.limitOut);
     }
 }
