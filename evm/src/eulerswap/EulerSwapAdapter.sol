@@ -55,21 +55,12 @@ contract EulerSwapAdapter is ISwapAdapter {
     ) external returns (Trade memory trade) {
         IEulerSwap pool = IEulerSwap(address(bytes20(poolId)));
 
-        uint256 amountIn;
-        uint256 amountOut;
-
         if (side == OrderSide.Buy) {
-            amountIn = (
-                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount)
-                    .denominator
-            );
-            trade.calculatedAmount = amountOut = specifiedAmount;
+            trade.calculatedAmount =
+                quoteExactOutput(pool, sellToken, buyToken, specifiedAmount);
         } else {
-            trade.calculatedAmount = amountIn = specifiedAmount;
-            amountOut = (
-                quoteExactInput(pool, sellToken, buyToken, specifiedAmount)
-                    .numerator
-            );
+            trade.calculatedAmount =
+                quoteExactInput(pool, sellToken, buyToken, specifiedAmount);
         }
 
         trade.gasUsed = SWAP_GAS_COST;
@@ -162,12 +153,12 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountIn
-    ) internal returns (Fraction memory calculatedPrice) {
+    ) internal returns (uint256 amountOut) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
         (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
 
-        uint256 amountOut = periphery.quoteExactInputWithReserves(
+        amountOut = periphery.quoteExactInputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
@@ -179,8 +170,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
-
-        calculatedPrice = Fraction(amountOut, amountIn);
     }
 
     /// @dev for testing only
@@ -197,12 +186,12 @@ contract EulerSwapAdapter is ISwapAdapter {
         address tokenIn,
         address tokenOut,
         uint256 amountOut
-    ) internal returns (Fraction memory calculatedPrice) {
+    ) internal returns (uint256 amountIn) {
         PoolCache storage cache = loadPoolCache(address(pool));
 
         (uint256 limitIn, uint256 limitOut) = getCachedLimits(cache, tokenIn);
 
-        uint256 amountIn = periphery.quoteExactOutputWithReserves(
+        amountIn = periphery.quoteExactOutputWithReserves(
             address(pool),
             tokenIn,
             tokenOut,
@@ -214,8 +203,6 @@ contract EulerSwapAdapter is ISwapAdapter {
         );
 
         updatePoolCache(cache, amountIn, amountOut, tokenIn);
-
-        calculatedPrice = Fraction(amountOut, amountIn);
     }
 
     function loadPoolCache(address pool) internal returns (PoolCache storage) {
@@ -273,6 +260,10 @@ contract EulerSwapAdapter is ISwapAdapter {
             amount0Out = amountOut;
             amount1In = amountIn;
         }
+
+        // 1 asset deposit would trigger zero shares error
+        if (amount0In == 1) amount0In = 0;
+        if (amount1In == 1) amount1In = 0;
 
         uint256 newReserve0 = cache.reserve0 + amount0In - amount0Out;
         uint256 newReserve1 = cache.reserve1 + amount1In - amount1Out;

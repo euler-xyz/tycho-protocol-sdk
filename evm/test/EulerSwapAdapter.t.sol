@@ -40,18 +40,12 @@ contract EulerSwapAdapterTest is AdapterTest {
     function testEulerSwap_Swap() public {
         bytes32 poolId = bytes32(bytes20(USDC_USDT_POOL));
 
-        address swapper = makeAddr("swapper");
-        deal(USDC, swapper, 10e6);
-
         uint256 amountIn = 5e6;
 
-        vm.startPrank(swapper);
-        IERC20(USDC).approve(address(adapter), amountIn);
         Trade memory trade =
             adapter.swap(poolId, USDC, USDT, OrderSide.Sell, amountIn);
-        vm.stopPrank();
 
-        assertEq(trade.calculatedAmount, 5e6);
+        assertEq(trade.calculatedAmount, 4886685);
         assertEq(trade.gasUsed, 750000);
     }
 
@@ -164,17 +158,18 @@ contract EulerSwapAdapterInvariants is Test {
 
         (uint112 reserve0, uint112 reserve1,) =
             IEulerSwap(USDC_USDT_POOL).getReserves();
-        assertApproxEqAbs(reserve0, cache.reserve0, 1);
-        assertApproxEqAbs(reserve1, cache.reserve1, 1);
+
+        assertEq(reserve0, cache.reserve0);
+        assertEq(reserve1, cache.reserve1);
 
         (uint256 limit0, uint256 limit1) =
             IEulerSwap(USDC_USDT_POOL).getLimits(asset0, asset1);
-        assertApproxEqAbs(cache.limit0to1.limitIn, limit0, 1);
-        assertApproxEqAbs(cache.limit0to1.limitOut, limit1, 1);
+        assertEq(cache.limit0to1.limitIn, limit0);
+        assertEq(cache.limit0to1.limitOut, limit1);
 
         (limit0, limit1) = IEulerSwap(USDC_USDT_POOL).getLimits(asset1, asset0);
-        assertApproxEqAbs(cache.limit1to0.limitIn, limit0, 1);
-        assertApproxEqAbs(cache.limit1to0.limitOut, limit1, 1);
+        assertEq(cache.limit1to0.limitIn, limit0);
+        assertEq(cache.limit1to0.limitOut, limit1);
     }
 }
 
@@ -199,23 +194,29 @@ contract EulerSwapAdapterHandler is Test {
         IERC20(asset0).safeIncreaseAllowance(
             EULER_SWAP_PERIPHERY, type(uint256).max
         );
-        IERC20(asset1).safeIncreaseAllowance(EULER_SWAP_PERIPHERY, 0);
+        IERC20(asset1).safeIncreaseAllowance(
+            EULER_SWAP_PERIPHERY, type(uint256).max
+        );
+
         deal(asset0, address(this), 1e25);
         deal(asset1, address(this), 1e25);
 
         adapter.initializeCache(_pool);
     }
 
-    function swap(ISwapAdapter.OrderSide side, bool isAsset0In, uint256 amount)
-        public
-    {
+    function swap(bool isSell, bool isAsset0In, uint256 amount) public {
+        ISwapAdapterTypes.OrderSide side = isSell
+            ? ISwapAdapterTypes.OrderSide.Sell
+            : ISwapAdapterTypes.OrderSide.Buy;
+
         // 1 wei amounts will hit zero shares error on deposit, ignore
-        if (amount <= 1) return;
+        if (side == ISwapAdapterTypes.OrderSide.Sell && amount <= 1) return;
 
         (address assetIn, address assetOut) =
             isAsset0In ? (asset0, asset1) : (asset1, asset0);
         (uint256 limitIn, uint256 limitOut) = pool.getLimits(assetIn, assetOut);
 
+        // check limits
         if (side == ISwapAdapterTypes.OrderSide.Sell && amount > limitIn) {
             return;
         }
@@ -223,8 +224,19 @@ contract EulerSwapAdapterHandler is Test {
             return;
         }
 
+        uint256 snapshotId = vm.snapshot();
         // quote swap through the adapter, remembering the results
-        adapter.swap(poolId, assetIn, assetOut, side, amount);
+        ISwapAdapterTypes.Trade memory trade =
+            adapter.swap(poolId, assetIn, assetOut, side, amount);
+
+        // check zero shares through buy side this time
+        if (
+            side == ISwapAdapterTypes.OrderSide.Buy
+                && trade.calculatedAmount == 1
+        ) {
+            vm.revertTo(snapshotId);
+            return;
+        }
 
         // simulate actual swap
         if (side == ISwapAdapterTypes.OrderSide.Sell) {
