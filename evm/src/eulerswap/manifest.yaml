@@ -1,7 +1,7 @@
 # information about the author helps us reach out in case of issues.
 author:
-  name: Haythem 
-  email: haythem@euler.xyz
+  name: Dariusz 
+  email: dariusz@euler.xyz
 
 # Protocol Constants
 constants:
@@ -10,7 +10,6 @@ constants:
   capabilities:
     - SellSide
     - BuySide
-    - PriceFunction
 
 # The file containing the adapter contract
 contract: EulerSwapAdapter.sol
@@ -21,5 +20,5 @@ instances:
       name: mainnet
       id: 1
     arguments:
-      - "0xB6cFe9b23d18A034cE925Ee84b97D20a52Db1940"
-      - "0x7fc1edF54d86DfAA90F1069E81D4B520A2A44d2B"
+      - "0x7E77D9F06056017334e26bEd92176222169DE6C1"
+      - "0xb653fb145B2EC8412E74eaB1a48756c54B083A0E"
