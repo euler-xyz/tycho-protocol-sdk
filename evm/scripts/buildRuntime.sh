@@ -2,9 +2,9 @@
 set -e 
 
 # Initialize our own variables
-CONTRACT_NAME=""
-CONSTRUCTOR_SIGNATURE=""
-CONSTRUCTOR_ARGUMENTS=""
+CONTRACT_NAME="EulerSwapAdapter"
+CONSTRUCTOR_SIGNATURE="constructor(address,address)"
+CONSTRUCTOR_ARGUMENTS="0x04C54FF83e4BC428FD1eDA2f41cdBd583A2e9cF8,0x64A8410D7D2ecF3Aaf32b6C3932e4586f3C42ecE"
 
 # Function to display usage 
 usage() { 
@@ -45,6 +45,6 @@ fi
 export __PROPELLER_CONTRACT="$CONTRACT_NAME.sol:$CONTRACT_NAME"
 export __PROPELLER_OUT_FILE="out/$CONTRACT_NAME.sol/$CONTRACT_NAME.evm.runtime"
 
-forge script scripts/_buildRuntime.s.sol -v
+forge script scripts/_buildRuntime.s.sol:buildRuntime -v
 
-echo "Write: $__PROPELLER_OUT_FILE"
+# echo "Write: $__PROPELLER_OUT_FILE"

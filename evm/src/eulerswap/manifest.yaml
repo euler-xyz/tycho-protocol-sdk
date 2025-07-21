@@ -1,0 +1,24 @@
+# information about the author helps us reach out in case of issues.
+author:
+  name: Dariusz 
+  email: dariusz@euler.xyz
+
+# Protocol Constants
+constants:
+  protocol_gas: 30000
+  # minimum capabilities we can expect, individual pools may extend these
+  capabilities:
+    - SellSide
+    - BuySide
+
+# The file containing the adapter contract
+contract: EulerSwapAdapter.sol
+
+# Deployment instances used to generate chain specific bytecode.
+instances:
+  - chain:
+      name: mainnet
+      id: 1
+    arguments:
+      - "0x7E77D9F06056017334e26bEd92176222169DE6C1"
+      - "0xb653fb145B2EC8412E74eaB1a48756c54B083A0E"
